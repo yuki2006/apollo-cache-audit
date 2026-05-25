@@ -209,6 +209,37 @@ apollo-cache-audit:
       junit: apollo-cache-audit.report.json
 ```
 
+## Examples
+
+Concrete test fixtures live under [`test/fixtures/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures). Each one is a minimal schema + cache config you can paste into your own project to see how the audit responds.
+
+### Bug-pattern reproductions
+
+These reproduce real-world Apollo cache bugs that the audit detects ahead of time. The schema files include detailed comments explaining the symptom and root cause:
+
+| Fixture | Symptom this reproduces |
+|---|---|
+| [`bug-stale-after-mutation/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/bug-stale-after-mutation) | UI shows old value after mutation succeeds; refresh fixes it. Child stats type lacks `id` |
+| [`bug-key-collision/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/bug-key-collision) | "Cache data may be lost when replacing the X field" warning; nested object overwritten by sibling |
+| [`bug-cursorless-pagination/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/bug-cursorless-pagination) | `fetchMore` keeps returning the same items in an infinite loop |
+| [`invalid-keyfields/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/invalid-keyfields) | Apollo throws `Invariant Violation: Missing field 'X' while extracting keyFields` at runtime |
+
+### Configuration shape examples
+
+How the audit handles various cache-config patterns:
+
+| Fixture | What it demonstrates |
+|---|---|
+| [`basic/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/basic) | Mixed schema — Node-implementing entity, value object via suffix, candidate flagged |
+| [`custom-handled/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/custom-handled) | `dataIdFromObject` switch case for a type that doesn't implement Node (`customButNotNode`) |
+| [`function-keyfields/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/function-keyfields) | Both `keyFields: ['orgId', 'userId']` array form and `keyFields: (obj) => ...` function form |
+| [`spread-policies/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/spread-policies) | `typePolicies: { ...basePolicies, ...extraPolicies }` resolved across object spreads |
+| [`interface-name-custom/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/interface-name-custom) | Non-standard Node interface name (`INode`) via `--node-interface` |
+| [`all-nodes/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/all-nodes) | Every type implements Node — audit produces zero findings |
+| [`value-objects-only/`](https://github.com/yuki2006/apollo-cache-audit/tree/main/test/fixtures/value-objects-only) | Schema with no entities; audit treats everything as value object |
+
+All fixtures are validated by [`test/audit.test.ts`](https://github.com/yuki2006/apollo-cache-audit/blob/main/test/audit.test.ts) and [`test/baseline.test.ts`](https://github.com/yuki2006/apollo-cache-audit/blob/main/test/baseline.test.ts) — those files double as executable documentation.
+
 ## FAQ
 
 **Q: How is this different from `@graphql-eslint/strict-id-in-types`?**
