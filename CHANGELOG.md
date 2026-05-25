@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0
+
+Real-world feedback-driven release: a user reported that v0.2 still missed several `dataIdFromObject` patterns common in production code, and that the single-tier recommendation didn't scale to ~93 candidates. Both issues are addressed here.
+
+### Features
+
+- **`dataIdFromObject` extraction extended** (closes #1)
+  - `new Map([['Foo', 'slug'], ...]).get(obj.__typename)` dispatch
+  - `as const` and `satisfies` annotated arrays/objects now resolved transparently
+  - `` `${obj.__typename}` `` template-literal equality
+  - `as`/`satisfies`/parentheses around the `__typename` argument also unwrapped
+- **Score-based recommendation engine** (closes #2)
+  - Replaced the single-best-guess heuristic with a weighted signal engine.
+  - Signals: id-like field name, timestamp field, foreign-key field name (`xxxId`), parent count, value-object field names (amount/lat/...), small-flat-shape, structural suffix, sibling-suffix grouping, non-Node interface implementation.
+  - `RecommendationInfo` now carries `confidence: 'low' | 'medium' | 'high'` and `signals[]`.
+  - New CLI flag `--strict-recommend` to omit low-confidence recommendations.
+
+### Tests
+
+- New fixtures: `map-dispatch/`, `as-const-types/`, `template-literal-typename/`.
+- Test count: 21 → 25.
+
 ## 0.2.0
 
 ### Features

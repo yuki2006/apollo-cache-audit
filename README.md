@@ -92,6 +92,7 @@ apollo-cache-audit --schema <path> --cache-config <path> [options]
 | `--fail-on-custom-without-node` | `false` | Exit non-zero on `customButNotNode` findings (high-confidence) |
 | `--fail-on-invalid-keyfields` | `false` | Exit non-zero when `typePolicies.keyFields` references a missing schema field |
 | `--fail-on-not-node` | `false` | Exit non-zero on types that normalize via id but lack `Node` interface (strict Relay) |
+| `--strict-recommend` | `false` | Omit low-confidence recommendations from output (only `medium`/`high` are emitted) |
 | `--report <path>` | (none) | Write rendered output to a file instead of stdout |
 | `--verbose` | `false` | Verbose logging |
 
@@ -269,7 +270,10 @@ Your `typePolicies[T].keyFields` references a field name that doesn't exist on `
 The type has an `id` (or `_id`) field declared in the schema, so Apollo normalizes it via the default identifier. But it doesn't `implements Node`. Apollo cache will work correctly. The category exists so teams adopting Relay's Global Object Identification spec can see which types still need formal Node membership. Gate with `--fail-on-not-node` to make this a hard requirement.
 
 **Q: What is the `recommendation` field on candidates for?**
-Each `nodePromotionCandidate` carries a heuristic suggestion (`add-id`, `mark-as-value-object`, or `add-suffix-rule`) plus a `reason` string explaining which signals drove it (id-like field names, parent count, field count, suffix matches). The recommendation is **advisory**, not authoritative — schema authors know intent the tool cannot infer. The reason text is designed to let you confirm or override the suggestion quickly.
+Each `nodePromotionCandidate` carries a heuristic suggestion (`add-id`, `mark-as-value-object`, or `add-suffix-rule`), a `confidence` level (`low` / `medium` / `high`), the list of `signals` that contributed to the verdict, and a `reason` string. Multiple weighted signals vote across the three categories; the winner is returned with the margin determining confidence. The recommendation is **advisory**, not authoritative — schema authors know intent the tool cannot infer. Pass `--strict-recommend` to drop `low`-confidence suggestions from output if you only want the heuristic to speak when it's confident.
+
+**Q: What signals does the recommendation engine use?**
+Entity-leaning (vote `add-id`): id-like field names (`slug`, `uuid`, ...), timestamp fields (`createdAt`, ...), foreign-key field names (`userId`, `orgId`, ...), parent count ≥ 2, non-Node interface membership. Value-object-leaning (vote `mark-as-value-object`): value-object field names (`amount`, `lat`, `lng`, ...), small flat shape (≤ 4 leaf fields, single parent). Suffix-leaning (vote `add-suffix-rule`): name ends in a structural suffix (`Stats`, `Meta`, `Detail`, ...) not already in `--ignore-suffixes`, or 2+ sibling candidates share the same suffix.
 
 **Q: Function-form `keyFields`?**
 Detected. The fields list will be reported as `"fn"` since static analysis can't enumerate the keys, but the type is correctly recognized as custom-handled.

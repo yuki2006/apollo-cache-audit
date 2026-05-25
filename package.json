@@ -1,6 +1,6 @@
 {
   "name": "apollo-cache-audit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Detect missing id fields on entity-shaped GraphQL types that would otherwise break Apollo Client cache normalization.",
   "type": "module",
   "license": "MIT",
