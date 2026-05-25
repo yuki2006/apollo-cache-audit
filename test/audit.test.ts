@@ -95,6 +95,21 @@ test("bug-cursorless-pagination: Item flagged", async () => {
   assert.deepEqual(names, ["Item"]);
 });
 
+test("dispatch-object: dataIdFromObject via { Type: fieldName }[__typename] dispatch", async () => {
+  const r = await runFixture("dispatch-object");
+  const namesCustom = r.customButNotNode.map((c) => c.name).sort();
+  // Both Organization and Workspace handled by the dispatch object; neither implements Node.
+  assert.deepEqual(namesCustom, ["Organization", "Workspace"]);
+});
+
+test("array-includes: dataIdFromObject via KNOWN_TYPES.includes(__typename)", async () => {
+  const r = await runFixture("array-includes");
+  const names = r.customButNotNode.map((c) => c.name).sort();
+  // LegacyItem is in the array list and used in schema; OtherLegacyType is in the list but
+  // not in schema, so won't appear (no synth probe possible).
+  assert.deepEqual(names, ["LegacyItem"]);
+});
+
 test("id-without-node: id-bearing types without Node interface bucket separately", async () => {
   const r = await runFixture("id-without-node");
   assert.deepEqual(r.nodeImplemented, ["User"]);

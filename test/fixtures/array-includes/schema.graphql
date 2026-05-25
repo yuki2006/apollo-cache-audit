@@ -1,0 +1,18 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  feed: Feed
+}
+
+type Feed implements Node {
+  id: ID!
+  legacy: LegacyItem
+}
+
+# Treated as entity via Array.includes check, no Node interface.
+type LegacyItem {
+  legacyId: ID!
+  label: String!
+}

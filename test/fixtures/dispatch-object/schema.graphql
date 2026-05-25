@@ -1,0 +1,23 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  org(slug: ID!): Organization
+}
+
+# Both treated as entities via dispatch object below. Neither implements Node.
+type Organization {
+  slug: ID!
+  name: String!
+}
+
+type Workspace {
+  handle: ID!
+  org: Organization
+}
+
+type Account implements Node {
+  id: ID!
+  workspace: Workspace
+}

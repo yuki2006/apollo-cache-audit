@@ -278,14 +278,15 @@ function extractDataIdSwitchCases(node: Node, out: Set<string>) {
       : node;
   if (!body) return;
 
-  // Find case clauses with string literal labels.
+  // Pattern 1: `case 'X':` in switch statements.
   for (const cc of body.getDescendantsOfKind(SyntaxKind.CaseClause)) {
     const expr = cc.getExpression();
     if (Node.isStringLiteral(expr) || Node.isNoSubstitutionTemplateLiteral(expr)) {
       out.add(expr.getLiteralText());
     }
   }
-  // Find `obj.__typename === 'X'` / `'X' === obj.__typename` comparisons.
+
+  // Pattern 2: `obj.__typename === 'X'` / `'X' === obj.__typename` comparisons.
   for (const bin of body.getDescendantsOfKind(SyntaxKind.BinaryExpression)) {
     const op = bin.getOperatorToken().getKind();
     if (
@@ -299,6 +300,75 @@ function extractDataIdSwitchCases(node: Node, out: Set<string>) {
     const tname = extractTypenameLiteral(left, right) ?? extractTypenameLiteral(right, left);
     if (tname) out.add(tname);
   }
+
+  // Pattern 3: object dispatch — `{ Foo: ..., Bar: ... }[obj.__typename]` or
+  //                              `HANDLERS[obj.__typename]` where HANDLERS is a const map.
+  for (const access of body.getDescendantsOfKind(SyntaxKind.ElementAccessExpression)) {
+    const argument = access.getArgumentExpression();
+    if (!argument || !isTypenameAccess(argument)) continue;
+    const dispatchObj = resolveElementAccessTarget(access.getExpression());
+    if (!dispatchObj) continue;
+    for (const prop of dispatchObj.getProperties()) {
+      if (Node.isPropertyAssignment(prop)) {
+        const name = getPropertyName(prop);
+        if (name) out.add(name);
+      }
+    }
+  }
+
+  // Pattern 4: array membership — `KNOWN_TYPES.includes(obj.__typename)` or
+  //                                `['Foo', 'Bar'].includes(obj.__typename)`.
+  for (const call of body.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const callee = call.getExpression();
+    if (!Node.isPropertyAccessExpression(callee)) continue;
+    if (callee.getName() !== "includes") continue;
+    const args = call.getArguments();
+    if (args.length !== 1) continue;
+    const firstArg = args[0];
+    if (!firstArg || !isTypenameAccess(firstArg)) continue;
+    const arr = resolveToArrayLiteral(callee.getExpression());
+    if (!arr) continue;
+    for (const el of arr.getElements()) {
+      if (Node.isStringLiteral(el) || Node.isNoSubstitutionTemplateLiteral(el)) {
+        out.add(el.getLiteralText());
+      }
+    }
+  }
+}
+
+function isTypenameAccess(n: Node): boolean {
+  if (Node.isPropertyAccessExpression(n) && n.getName() === "__typename") return true;
+  if (Node.isParenthesizedExpression(n)) return isTypenameAccess(n.getExpression());
+  // `obj.__typename ?? ""` or `obj.__typename || ""` — left side is what we care about.
+  if (Node.isBinaryExpression(n)) {
+    const op = n.getOperatorToken().getKind();
+    if (op === SyntaxKind.QuestionQuestionToken || op === SyntaxKind.BarBarToken) {
+      return isTypenameAccess(n.getLeft());
+    }
+  }
+  // `obj?.__typename` — optional chain
+  if (Node.isPropertyAccessExpression(n) && n.hasQuestionDotToken() && n.getName() === "__typename") {
+    return true;
+  }
+  return false;
+}
+
+function resolveElementAccessTarget(node: Node): ObjectLiteralExpression | undefined {
+  if (Node.isObjectLiteralExpression(node)) return node;
+  if (Node.isIdentifier(node)) {
+    const resolved = followIdentifier(node);
+    if (resolved && Node.isObjectLiteralExpression(resolved)) return resolved;
+  }
+  return undefined;
+}
+
+function resolveToArrayLiteral(node: Node): import("ts-morph").ArrayLiteralExpression | undefined {
+  if (Node.isArrayLiteralExpression(node)) return node;
+  if (Node.isIdentifier(node)) {
+    const resolved = followIdentifier(node);
+    if (resolved && Node.isArrayLiteralExpression(resolved)) return resolved;
+  }
+  return undefined;
 }
 
 function extractTypenameLiteral(
