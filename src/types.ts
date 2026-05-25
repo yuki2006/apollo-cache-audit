@@ -31,8 +31,24 @@ export type Recommendation =
   | "mark-as-value-object"
   | "add-suffix-rule";
 
+export type Confidence = "low" | "medium" | "high";
+
+export interface RecommendationSignal {
+  /** Short identifier — e.g. "timestamp-field", "foreign-key-suffix". */
+  name: string;
+  /** Positive integer; higher = stronger signal. */
+  weight: number;
+  /** Recommendation this signal votes for. */
+  votes: Recommendation;
+}
+
 export interface RecommendationInfo {
   primary: Recommendation;
+  /** "high" when winning margin clearly dominates; "low" when no signal scored or top two are close. */
+  confidence: Confidence;
+  /** All signals that fired, sorted by weight descending. */
+  signals: RecommendationSignal[];
+  /** Human-readable explanation derived from top signals. */
   reason: string;
 }
 
@@ -117,6 +133,7 @@ export interface CliOptions {
   failOnCustomWithoutNode?: boolean;
   failOnInvalidKeyfields?: boolean;
   failOnNotNode?: boolean;
+  strictRecommend?: boolean;
   report?: string;
   verbose?: boolean;
 }

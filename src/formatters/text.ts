@@ -58,7 +58,8 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
       const refs = c.referencedFrom.length > 0 ? ` ← ${c.referencedFrom.join(", ")}` : "";
       lines.push(`   - ${c.name}${loc}${refs}`);
       if (c.recommendation) {
-        lines.push(`       suggest: ${c.recommendation.primary} — ${c.recommendation.reason}`);
+        const conf = c.recommendation.confidence;
+        lines.push(`       suggest [${conf}]: ${c.recommendation.primary} — ${c.recommendation.reason}`);
       }
     }
     lines.push("");

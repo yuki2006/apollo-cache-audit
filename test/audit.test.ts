@@ -135,32 +135,42 @@ test("id-without-node: id-bearing types without Node interface bucket separately
   assert.equal(r.nodePromotionCandidate.length, 0);
 });
 
-test("recommendation: candidate with id-like field suggests add-id", async () => {
+test("recommendation: candidate with id-like field suggests add-id with high/medium confidence", async () => {
   const r = await runFixture("basic");
-  // Tag has 'slug' which is an id-like field — should be add-id.
   const tag = r.nodePromotionCandidate.find((c) => c.name === "Tag");
   assert.ok(tag, "expected Tag candidate");
   assert.equal(tag.recommendation?.primary, "add-id");
+  assert.ok(["medium", "high"].includes(tag.recommendation?.confidence ?? "low"));
   assert.match(tag.recommendation?.reason ?? "", /slug/);
 });
 
-test("recommendation: bug-key-collision Author (2 fields, 1 parent) falls into value-object heuristic", async () => {
-  // Author { name, bio } has no id-like field, 1 parent, 2 scalar fields — matches the
-  // value-object shape heuristic. The reason text gives the user enough info to override
-  // if Author is actually an entity (which a human would know but the heuristic cannot).
+test("recommendation: bug-key-collision Author classified as value-object by shape", async () => {
   const r = await runFixture("bug-key-collision");
   const author = r.nodePromotionCandidate.find((c) => c.name === "Author");
   assert.ok(author);
   assert.equal(author.recommendation?.primary, "mark-as-value-object");
-  assert.match(author.recommendation?.reason ?? "", /value object|--ignore-types/);
+  assert.match(author.recommendation?.reason ?? "", /value-object|small-flat-shape|leaf-only/);
 });
 
-test("recommendation: bug-stale-after-mutation ArticleStats suggests add-suffix-rule (Stats suffix)", async () => {
+test("recommendation: bug-stale-after-mutation ArticleStats votes add-suffix-rule (Stats suffix)", async () => {
   const r = await runFixture("bug-stale-after-mutation");
   const stats = r.nodePromotionCandidate.find((c) => c.name === "ArticleStats");
   assert.ok(stats);
   assert.equal(stats.recommendation?.primary, "add-suffix-rule");
-  assert.match(stats.recommendation?.reason ?? "", /Stats/);
+  const sigNames = stats.recommendation?.signals.map((s) => s.name) ?? [];
+  assert.ok(sigNames.some((n) => n.includes("Stats")), "expected Stats suffix signal");
+});
+
+test("recommendation: signals array is populated and sorted by weight", async () => {
+  const r = await runFixture("basic");
+  const tag = r.nodePromotionCandidate.find((c) => c.name === "Tag");
+  assert.ok(tag?.recommendation);
+  assert.ok(tag.recommendation.signals.length > 0);
+  for (let i = 1; i < tag.recommendation.signals.length; i++) {
+    const prev = tag.recommendation.signals[i - 1]!.weight;
+    const cur = tag.recommendation.signals[i]!.weight;
+    assert.ok(prev >= cur, "signals must be weight-descending");
+  }
 });
 
 test("invalid-keyfields: detects missing fields referenced by typePolicies", async () => {

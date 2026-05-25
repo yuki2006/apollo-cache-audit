@@ -121,16 +121,13 @@ export function classify(input: ClassifyInput): Classification {
     }
 
     const referencedFromSorted = normalizedParents.sort();
+    // Recommendation is filled in a second pass below, after we know all candidate names
+    // for cross-candidate signals like suffix grouping.
     nodePromotionCandidate.push({
       name: t.name,
       referencedFrom: referencedFromSorted,
       line: schemaModel.lineByType.get(t.name),
       file: schemaModel.schemaFilePath,
-      recommendation: recommend({
-        type: t,
-        referencedFrom: referencedFromSorted,
-        activeIgnoreSuffixes: ignoreSuffixes,
-      }),
     });
   }
 
@@ -140,6 +137,19 @@ export function classify(input: ClassifyInput): Classification {
   customHandled.sort((a, b) => a.name.localeCompare(b.name));
   customButNotNode.sort((a, b) => a.name.localeCompare(b.name));
   nodePromotionCandidate.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Second pass: assign recommendations now that all candidate names are known.
+  const allCandidateNames = nodePromotionCandidate.map((c) => c.name);
+  for (const c of nodePromotionCandidate) {
+    const objType = schemaModel.schema.getType(c.name);
+    if (!objType || !("getFields" in objType)) continue;
+    c.recommendation = recommend({
+      type: objType as import("graphql").GraphQLObjectType,
+      referencedFrom: c.referencedFrom,
+      activeIgnoreSuffixes: ignoreSuffixes,
+      allCandidateNames,
+    });
+  }
   invalidKeyFields.sort((a, b) => a.type.localeCompare(b.type));
 
   return {

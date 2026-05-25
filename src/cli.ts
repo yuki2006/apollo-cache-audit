@@ -37,6 +37,7 @@ program
   .option("--fail-on-custom-without-node", "Exit non-zero on customButNotNode findings")
   .option("--fail-on-invalid-keyfields", "Exit non-zero when typePolicies.keyFields references missing schema fields")
   .option("--fail-on-not-node", "Exit non-zero on types that normalize via id but do not implement the Node interface")
+  .option("--strict-recommend", "Omit recommendations with low confidence (only emit medium/high)")
   .option("--report <path>", "Write report to file (in --format)")
   .option("--verbose", "Verbose logging")
   .action(async (opts: CliOptions) => {
@@ -62,6 +63,14 @@ async function run(opts: CliOptions) {
     ignoreTypes,
     baseline: opts.baseline,
   });
+
+  if (opts.strictRecommend) {
+    for (const c of result.nodePromotionCandidate) {
+      if (c.recommendation && c.recommendation.confidence === "low") {
+        delete (c as { recommendation?: unknown }).recommendation;
+      }
+    }
+  }
 
   if (opts.updateBaseline) {
     if (!opts.baseline) {
