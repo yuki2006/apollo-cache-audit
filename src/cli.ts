@@ -31,7 +31,11 @@ program
   .option("--ignore-types <list>", "Comma-separated type names to skip")
   .option("--baseline <path>", "Baseline JSON of known candidates")
   .option("--update-baseline", "Write current candidates to --baseline path")
-  .option("--format <text|json|github>", "Output format", "text")
+  .option(
+    "--format <text|json|github|jsonschema>",
+    "Output format. jsonschema emits the AuditResult JSON Schema (no audit run).",
+    "text",
+  )
   .option(
     "--fail-on <none|new|suspect|all>",
     "Fail conditions: none=never, new=baseline-new, suspect=any candidate, all=any finding",
@@ -55,6 +59,15 @@ program
   });
 
 async function run(opts: CliOptions) {
+  // Short-circuit: --format jsonschema emits the schema without running an audit.
+  if (opts.format === "jsonschema") {
+    const { formatJsonSchema } = await import("./formatters/jsonschema.js");
+    const out = formatJsonSchema();
+    if (opts.report) writeFileSync(opts.report, out, "utf8");
+    else process.stdout.write(out);
+    process.exit(0);
+  }
+
   const ignoreSuffixes = splitList(opts.ignoreSuffixes);
   const ignoreTypes = splitList(opts.ignoreTypes);
   const cacheConfigPaths = splitList(opts.cacheConfig);

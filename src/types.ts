@@ -151,7 +151,7 @@ export interface BaselineData {
   customButNotNode: BaselineEntry[];
 }
 
-export type OutputFormat = "text" | "json" | "github";
+export type OutputFormat = "text" | "json" | "github" | "jsonschema";
 
 export type FailOn = "none" | "new" | "suspect" | "all";
 
