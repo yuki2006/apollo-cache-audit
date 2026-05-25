@@ -102,6 +102,24 @@ test("dispatch-object: dataIdFromObject via { Type: fieldName }[__typename] disp
   assert.deepEqual(namesCustom, ["Organization", "Workspace"]);
 });
 
+test("map-dispatch: dataIdFromObject via new Map([[T, field], ...]).get(__typename)", async () => {
+  const r = await runFixture("map-dispatch");
+  const names = r.customButNotNode.map((c) => c.name).sort();
+  assert.deepEqual(names, ["Card", "CollectionThumbnail"]);
+});
+
+test("as-const-types: as-const array literal unwrapped for Array.includes detection", async () => {
+  const r = await runFixture("as-const-types");
+  const names = r.customButNotNode.map((c) => c.name).sort();
+  assert.deepEqual(names, ["PrepaidPointBalance", "UserItem"]);
+});
+
+test("template-literal-typename: `${obj.__typename}` === 'X' detected", async () => {
+  const r = await runFixture("template-literal-typename");
+  const names = r.customButNotNode.map((c) => c.name).sort();
+  assert.deepEqual(names, ["ItemCollectContentItem"]);
+});
+
 test("array-includes: dataIdFromObject via KNOWN_TYPES.includes(__typename)", async () => {
   const r = await runFixture("array-includes");
   const names = r.customButNotNode.map((c) => c.name).sort();

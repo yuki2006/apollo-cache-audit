@@ -1,0 +1,24 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  card(slug: ID!): Card
+}
+
+# Both treated as entities via Map dispatch below. Neither implements Node.
+type Card {
+  slug: ID!
+  title: String!
+}
+
+type CollectionThumbnail {
+  collectionKey: ID!
+  url: String!
+}
+
+type Account implements Node {
+  id: ID!
+  card: Card
+  thumb: CollectionThumbnail
+}

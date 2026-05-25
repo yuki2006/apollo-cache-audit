@@ -127,12 +127,9 @@ function resolveToObjectLiteral(expr: Expression): ObjectLiteralExpression | und
   const seen = new Set<Node>();
   while (cur && !seen.has(cur)) {
     seen.add(cur);
-    if (Node.isParenthesizedExpression(cur)) {
-      cur = cur.getExpression();
-      continue;
-    }
-    if (Node.isAsExpression(cur) || Node.isTypeAssertion(cur)) {
-      cur = cur.getExpression();
+    const unwrapped = unwrapTypeAnnotations(cur);
+    if (unwrapped !== cur) {
+      cur = unwrapped;
       continue;
     }
     if (Node.isObjectLiteralExpression(cur)) return cur;
@@ -151,6 +148,18 @@ function resolveToObjectLiteral(expr: Expression): ObjectLiteralExpression | und
     return undefined;
   }
   return undefined;
+}
+
+/**
+ * Strip type-system wrappers (parens, `as const`, `as T`, type assertions, `satisfies T`)
+ * around a value expression. Returns the original node if nothing to strip.
+ */
+function unwrapTypeAnnotations(n: Node): Node {
+  if (Node.isParenthesizedExpression(n)) return n.getExpression();
+  if (Node.isAsExpression(n)) return n.getExpression();
+  if (Node.isTypeAssertion(n)) return n.getExpression();
+  if (Node.isSatisfiesExpression(n)) return n.getExpression();
+  return n;
 }
 
 function followIdentifier(id: Identifier): Node | undefined {
@@ -334,11 +343,72 @@ function extractDataIdSwitchCases(node: Node, out: Set<string>) {
       }
     }
   }
+
+  // Pattern 5: Map dispatch — `MAP.get(obj.__typename)` where MAP is `new Map([[K, V], ...])`.
+  for (const call of body.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const callee = call.getExpression();
+    if (!Node.isPropertyAccessExpression(callee)) continue;
+    if (callee.getName() !== "get") continue;
+    const args = call.getArguments();
+    if (args.length !== 1) continue;
+    const firstArg = args[0];
+    if (!firstArg || !isTypenameAccess(firstArg)) continue;
+    const tuples = resolveToNewMapInitializer(callee.getExpression());
+    if (!tuples) continue;
+    for (const tuple of tuples) {
+      if (Node.isStringLiteral(tuple) || Node.isNoSubstitutionTemplateLiteral(tuple)) {
+        out.add(tuple.getLiteralText());
+      }
+    }
+  }
+}
+
+/**
+ * For an expression that should resolve to `new Map([[K1, V1], [K2, V2], ...])`, return the
+ * list of K nodes. Handles identifier indirection and as-const wrappers.
+ */
+function resolveToNewMapInitializer(node: Node): Node[] | undefined {
+  let cur: Node = node;
+  for (let i = 0; i < 8; i++) {
+    const stripped = unwrapTypeAnnotations(cur);
+    if (stripped !== cur) {
+      cur = stripped;
+      continue;
+    }
+    if (Node.isIdentifier(cur)) {
+      const resolved = followIdentifier(cur);
+      if (!resolved) return undefined;
+      cur = resolved;
+      continue;
+    }
+    break;
+  }
+  if (!Node.isNewExpression(cur)) return undefined;
+  const ctor = cur.getExpression();
+  if (ctor.getText() !== "Map") return undefined;
+  const args = cur.getArguments();
+  if (args.length !== 1) return undefined;
+  const firstArg = args[0];
+  if (!firstArg) return undefined;
+  const arr = resolveToArrayLiteral(firstArg);
+  if (!arr) return undefined;
+  const keys: Node[] = [];
+  for (const tuple of arr.getElements()) {
+    const stripped = unwrapTypeAnnotations(tuple);
+    const list = Node.isArrayLiteralExpression(stripped) ? stripped : undefined;
+    if (!list) continue;
+    const first = list.getElements()[0];
+    if (first) keys.push(first);
+  }
+  return keys;
 }
 
 function isTypenameAccess(n: Node): boolean {
   if (Node.isPropertyAccessExpression(n) && n.getName() === "__typename") return true;
   if (Node.isParenthesizedExpression(n)) return isTypenameAccess(n.getExpression());
+  if (Node.isAsExpression(n)) return isTypenameAccess(n.getExpression());
+  if (Node.isSatisfiesExpression(n)) return isTypenameAccess(n.getExpression());
+  if (Node.isTypeAssertion(n)) return isTypenameAccess(n.getExpression());
   // `obj.__typename ?? ""` or `obj.__typename || ""` — left side is what we care about.
   if (Node.isBinaryExpression(n)) {
     const op = n.getOperatorToken().getKind();
@@ -349,6 +419,19 @@ function isTypenameAccess(n: Node): boolean {
   // `obj?.__typename` — optional chain
   if (Node.isPropertyAccessExpression(n) && n.hasQuestionDotToken() && n.getName() === "__typename") {
     return true;
+  }
+  // `\`${obj.__typename}\`` — template literal with single __typename interpolation and
+  // no surrounding text.
+  if (Node.isTemplateExpression(n)) {
+    const headText = n.getHead().getLiteralText();
+    const spans = n.getTemplateSpans();
+    if (headText === "" && spans.length === 1) {
+      const span = spans[0];
+      if (span) {
+        const tail = span.getLiteral().getLiteralText();
+        if (tail === "") return isTypenameAccess(span.getExpression());
+      }
+    }
   }
   return false;
 }
@@ -363,10 +446,21 @@ function resolveElementAccessTarget(node: Node): ObjectLiteralExpression | undef
 }
 
 function resolveToArrayLiteral(node: Node): import("ts-morph").ArrayLiteralExpression | undefined {
-  if (Node.isArrayLiteralExpression(node)) return node;
-  if (Node.isIdentifier(node)) {
-    const resolved = followIdentifier(node);
-    if (resolved && Node.isArrayLiteralExpression(resolved)) return resolved;
+  let cur: Node = node;
+  for (let i = 0; i < 8; i++) {
+    const stripped = unwrapTypeAnnotations(cur);
+    if (stripped !== cur) {
+      cur = stripped;
+      continue;
+    }
+    if (Node.isArrayLiteralExpression(cur)) return cur;
+    if (Node.isIdentifier(cur)) {
+      const resolved = followIdentifier(cur);
+      if (!resolved) return undefined;
+      cur = resolved;
+      continue;
+    }
+    return undefined;
   }
   return undefined;
 }
@@ -376,8 +470,7 @@ function extractTypenameLiteral(
   other: Node,
 ): string | undefined {
   if (
-    Node.isPropertyAccessExpression(side) &&
-    side.getName() === "__typename" &&
+    isTypenameAccess(side) &&
     (Node.isStringLiteral(other) || Node.isNoSubstitutionTemplateLiteral(other))
   ) {
     return other.getLiteralText();

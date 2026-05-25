@@ -1,0 +1,17 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  item: ItemCollectContentItem
+}
+
+type ItemCollectContentItem {
+  contentItemId: ID!
+  position: Int!
+}
+
+type Container implements Node {
+  id: ID!
+  contentItem: ItemCollectContentItem
+}

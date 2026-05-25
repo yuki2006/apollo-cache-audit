@@ -1,0 +1,24 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  account: Account
+}
+
+type Account implements Node {
+  id: ID!
+  prepaid: PrepaidPointBalance
+  userItem: UserItem
+}
+
+# Both treated as entities via `as const` array dispatch below. Neither implements Node.
+type PrepaidPointBalance {
+  accountId: ID!
+  amount: Int!
+}
+
+type UserItem {
+  itemId: ID!
+  ownerId: ID!
+}
