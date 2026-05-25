@@ -1,8 +1,12 @@
 export interface AuditOptions {
   /** Path to .graphql SDL, raw SDL string, or pre-built GraphQLSchema. */
   schema: string;
-  /** Path to .ts/.js file containing `new InMemoryCache({...})`. */
-  cacheConfig: string;
+  /**
+   * Path to .ts/.js file containing `new InMemoryCache({...})`, or an array of paths to merge.
+   * When multiple files are provided, their typePolicies and dataIdFromObject extractions are
+   * unioned; conflicting keyFields entries emit a warning and the first wins.
+   */
+  cacheConfig: string | string[];
   /** tsconfig.json path for cross-file resolution. Auto-detected if omitted. */
   tsConfigPath?: string;
   /** Interface name used to mark entities. Default: "Node". */
@@ -92,6 +96,15 @@ export interface InvalidKeyFieldsInfo {
   missingFields: string[];
 }
 
+export interface CacheConfigConflictInfo {
+  /** Type whose configuration differs across input cache-config files. */
+  type: string;
+  /** Conflicting keyFields specifications observed, in input order. */
+  keyFields: Array<readonly string[] | "fn" | false>;
+  /** Cache-config file paths that contributed each entry. */
+  sources: string[];
+}
+
 export interface AuditResult {
   /** Object types that implement the Node interface AND normalize via default id. */
   nodeImplemented: string[];
@@ -110,6 +123,8 @@ export interface AuditResult {
    * These cause runtime InvariantError from Apollo on identify() — high-confidence misconfiguration.
    */
   invalidKeyFields: InvalidKeyFieldsInfo[];
+  /** Cache-config conflicts when multi-config is enabled and entries disagree per type. */
+  cacheConfigConflicts: CacheConfigConflictInfo[];
   /** Populated only when a baseline is provided. */
   newSinceBaseline: NodeCandidateInfo[];
   /** Candidates present in baseline but no longer detected. */

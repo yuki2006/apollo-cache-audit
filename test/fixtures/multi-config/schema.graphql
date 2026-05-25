@@ -1,0 +1,23 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  article(id: ID!): Article
+}
+
+type Article implements Node {
+  id: ID!
+  org: Organization
+  user: UserProfile
+}
+
+type Organization {
+  slug: ID!
+  name: String!
+}
+
+type UserProfile {
+  handle: ID!
+  name: String!
+}

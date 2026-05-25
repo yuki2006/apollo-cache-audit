@@ -214,6 +214,23 @@ test("union-mixed-members: Video has referencedEdges with kind=union", async () 
   assert.ok(r.nodeImplemented.includes("Photo"));
 });
 
+test("multi-config: merges two cache files and detects conflicts", async () => {
+  const r = await audit({
+    schema: resolve(fixtureDir("multi-config"), "schema.graphql"),
+    cacheConfig: [
+      resolve(fixtureDir("multi-config"), "cache-a.ts"),
+      resolve(fixtureDir("multi-config"), "cache-b.ts"),
+    ],
+  });
+  const customNames = r.customButNotNode.map((c) => c.name).sort();
+  assert.ok(customNames.includes("Organization"));
+  assert.ok(customNames.includes("UserProfile"));
+  assert.equal(r.cacheConfigConflicts.length, 1);
+  assert.equal(r.cacheConfigConflicts[0]?.type, "Organization");
+  assert.equal(r.cacheConfigConflicts[0]?.keyFields.length, 2);
+  assert.equal(r.cacheConfigConflicts[0]?.sources.length, 2);
+});
+
 test("invalid-keyfields: detects missing fields referenced by typePolicies", async () => {
   const r = await runFixture("invalid-keyfields");
   assert.equal(r.invalidKeyFields.length, 1);

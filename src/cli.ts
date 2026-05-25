@@ -21,7 +21,10 @@ program
       "which would silently break Apollo Client cache normalization.",
   )
   .requiredOption("--schema <path>", "Path to GraphQL SDL")
-  .requiredOption("--cache-config <path>", "Path to TS/JS file with `new InMemoryCache(...)`")
+  .requiredOption(
+    "--cache-config <path>",
+    "TS/JS file with `new InMemoryCache(...)`. Comma-separate multiple paths to merge.",
+  )
   .option("--ts-config <path>", "tsconfig.json for cross-file resolution")
   .option("--node-interface <name>", "Interface name marking entities", "Node")
   .option("--ignore-suffixes <list>", "Comma-separated suffixes treated as value objects")
@@ -54,10 +57,15 @@ program
 async function run(opts: CliOptions) {
   const ignoreSuffixes = splitList(opts.ignoreSuffixes);
   const ignoreTypes = splitList(opts.ignoreTypes);
+  const cacheConfigPaths = splitList(opts.cacheConfig);
+  const cacheConfig =
+    cacheConfigPaths && cacheConfigPaths.length > 1
+      ? cacheConfigPaths
+      : opts.cacheConfig;
 
   const result = await audit({
     schema: opts.schema,
-    cacheConfig: opts.cacheConfig,
+    cacheConfig,
     tsConfigPath: opts.tsConfig,
     nodeInterface: opts.nodeInterface,
     ignoreSuffixes,

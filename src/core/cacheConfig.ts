@@ -12,7 +12,7 @@ import {
   type PropertyAssignment,
   type SourceFile,
 } from "ts-morph";
-import type { CustomCacheInfo } from "../types.js";
+import type { CacheConfigConflictInfo, CustomCacheInfo } from "../types.js";
 
 export interface CacheConfigModel {
   /** Types reachable via dataIdFromObject (switch/if branches with string literals). */
@@ -23,10 +23,13 @@ export interface CacheConfigModel {
   customHandled: CustomCacheInfo[];
   /** typePolicies typenames seen, regardless of keyFields presence. */
   typePolicyTypes: Set<string>;
+  /** Cross-file conflicts when multiple cache-config inputs disagree on the same type. */
+  conflicts: CacheConfigConflictInfo[];
 }
 
 export interface LoadCacheConfigInput {
-  cacheConfigPath: string;
+  /** Single path or multiple paths to merge. */
+  cacheConfigPath: string | string[];
   tsConfigPath?: string;
 }
 
@@ -34,19 +37,69 @@ export function loadCacheConfig({
   cacheConfigPath,
   tsConfigPath,
 }: LoadCacheConfigInput): CacheConfigModel {
-  const project = createProject(cacheConfigPath, tsConfigPath);
-  const entry = project.addSourceFileAtPath(resolve(cacheConfigPath));
+  const paths = Array.isArray(cacheConfigPath) ? cacheConfigPath : [cacheConfigPath];
+  if (paths.length === 0) {
+    throw new Error("cacheConfigPath must contain at least one path");
+  }
 
-  const configObjects = findInMemoryCacheConfigs(entry);
   const merged: CacheConfigModel = {
     dataIdTypes: new Set(),
     keyFieldsTypes: new Map(),
     customHandled: [],
     typePolicyTypes: new Set(),
+    conflicts: [],
   };
 
-  for (const obj of configObjects) {
-    extractFromConfigObject(obj, merged);
+  // Track per-file extractions so we can detect cross-file conflicts on keyFields.
+  const sourcesByType = new Map<
+    string,
+    Array<{ source: string; keyFields: readonly string[] | "fn" | false }>
+  >();
+
+  for (const p of paths) {
+    const project = createProject(p, tsConfigPath);
+    const entry = project.addSourceFileAtPath(resolve(p));
+    const configObjects = findInMemoryCacheConfigs(entry);
+
+    const fileModel: CacheConfigModel = {
+      dataIdTypes: new Set(),
+      keyFieldsTypes: new Map(),
+      customHandled: [],
+      typePolicyTypes: new Set(),
+      conflicts: [],
+    };
+    for (const obj of configObjects) extractFromConfigObject(obj, fileModel);
+
+    for (const t of fileModel.dataIdTypes) merged.dataIdTypes.add(t);
+    for (const t of fileModel.typePolicyTypes) merged.typePolicyTypes.add(t);
+    for (const [t, kf] of fileModel.keyFieldsTypes) {
+      const prior = sourcesByType.get(t) ?? [];
+      prior.push({ source: p, keyFields: kf });
+      sourcesByType.set(t, prior);
+      if (!merged.keyFieldsTypes.has(t)) {
+        // First write wins; conflicts are reported below.
+        merged.keyFieldsTypes.set(t, kf);
+      }
+    }
+  }
+
+  // Detect conflicts: type seen in >1 source with divergent keyFields specs.
+  for (const [type, entries] of sourcesByType) {
+    if (entries.length < 2) continue;
+    const seen = new Set<string>();
+    const unique: Array<readonly string[] | "fn" | false> = [];
+    const sources: string[] = [];
+    for (const e of entries) {
+      const sig = signatureOfKeyFields(e.keyFields);
+      if (!seen.has(sig)) {
+        seen.add(sig);
+        unique.push(e.keyFields);
+        sources.push(e.source);
+      }
+    }
+    if (unique.length > 1) {
+      merged.conflicts.push({ type, keyFields: unique, sources });
+    }
   }
 
   for (const t of merged.dataIdTypes) {
@@ -62,6 +115,12 @@ export function loadCacheConfig({
   }
 
   return merged;
+}
+
+function signatureOfKeyFields(kf: readonly string[] | "fn" | false): string {
+  if (kf === false) return "false";
+  if (kf === "fn") return "fn";
+  return JSON.stringify([...kf]);
 }
 
 function createProject(cacheConfigPath: string, tsConfigPath?: string): Project {

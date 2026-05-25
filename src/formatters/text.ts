@@ -13,6 +13,7 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
   lines.push(`custom-but-not-node:     ${result.customButNotNode.length}  ${badge(result.customButNotNode.length)}`);
   lines.push(`node-promotion-candidate:${result.nodePromotionCandidate.length}  ${badge(result.nodePromotionCandidate.length)}`);
   lines.push(`invalid-keyfields:       ${result.invalidKeyFields.length}  ${badge(result.invalidKeyFields.length)}`);
+  lines.push(`cache-config-conflicts:  ${result.cacheConfigConflicts.length}  ${badge(result.cacheConfigConflicts.length)}`);
   if (opts.baselineUsed) {
     lines.push(`new since baseline:      ${result.newSinceBaseline.length}  ${badge(result.newSinceBaseline.length)}`);
     lines.push(`resolved since baseline: ${result.resolvedSinceBaseline.length}`);
@@ -24,6 +25,19 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
     lines.push("   (cache works; Relay Global Object Identification non-compliant)");
     for (const n of result.apolloCompatibleNotNode) {
       lines.push(`   - ${n}`);
+    }
+    lines.push("");
+  }
+
+  if (result.cacheConfigConflicts.length > 0) {
+    lines.push("⚠ Cache-config conflicts across input files");
+    lines.push("   (multiple --cache-config inputs disagree on keyFields for the same type;");
+    lines.push("    first occurrence wins)");
+    for (const conflict of result.cacheConfigConflicts) {
+      lines.push(`   - ${conflict.type}:`);
+      for (let i = 0; i < conflict.keyFields.length; i++) {
+        lines.push(`       ${conflict.sources[i]} -> ${JSON.stringify(conflict.keyFields[i])}`);
+      }
     }
     lines.push("");
   }
@@ -81,7 +95,8 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
   if (
     result.customButNotNode.length === 0 &&
     candidates.length === 0 &&
-    result.invalidKeyFields.length === 0
+    result.invalidKeyFields.length === 0 &&
+    result.cacheConfigConflicts.length === 0
   ) {
     lines.push("✓ No findings.");
     lines.push("");

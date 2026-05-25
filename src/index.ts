@@ -42,6 +42,7 @@ export async function audit(options: AuditOptions): Promise<AuditResult> {
 
   return {
     ...cls,
+    cacheConfigConflicts: cacheConfig.conflicts,
     newSinceBaseline,
     resolvedSinceBaseline,
     schemaHash: schemaModel.schemaHash,
