@@ -52,6 +52,7 @@ apollo-cache-audit
 
 schema sha256: 9f3a7b21c4d8…
 node-implemented:        42
+apollo-ok-not-node:      3  ℹ
 value-objects:           18
 custom-handled:          3
 custom-but-not-node:     1  ←
@@ -90,6 +91,7 @@ apollo-cache-audit --schema <path> --cache-config <path> [options]
 | `--fail-on <none\|new\|suspect\|all>` | `none` | Exit non-zero condition |
 | `--fail-on-custom-without-node` | `false` | Exit non-zero on `customButNotNode` findings (high-confidence) |
 | `--fail-on-invalid-keyfields` | `false` | Exit non-zero when `typePolicies.keyFields` references a missing schema field |
+| `--fail-on-not-node` | `false` | Exit non-zero on types that normalize via id but lack `Node` interface (strict Relay) |
 | `--report <path>` | (none) | Write rendered output to a file instead of stdout |
 | `--verbose` | `false` | Verbose logging |
 
@@ -262,6 +264,9 @@ You added a type to `dataIdFromObject` or `typePolicies.keyFields`, meaning at r
 
 **Q: An `invalidKeyFields` finding — what does it mean?**
 Your `typePolicies[T].keyFields` references a field name that doesn't exist on `T` in the schema. Apollo throws `InvariantError` the first time it tries to normalize a `T` (e.g. `Missing field 'orgId' while extracting keyFields`). This is the **highest-confidence** finding — it's not a heuristic, it's a runtime crash the tool reproduces ahead of time.
+
+**Q: What does `apolloCompatibleNotNode` mean?**
+The type has an `id` (or `_id`) field declared in the schema, so Apollo normalizes it via the default identifier. But it doesn't `implements Node`. Apollo cache will work correctly. The category exists so teams adopting Relay's Global Object Identification spec can see which types still need formal Node membership. Gate with `--fail-on-not-node` to make this a hard requirement.
 
 **Q: Function-form `keyFields`?**
 Detected. The fields list will be reported as `"fn"` since static analysis can't enumerate the keys, but the type is correctly recognized as custom-handled.

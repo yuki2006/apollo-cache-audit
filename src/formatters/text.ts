@@ -7,6 +7,7 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
   lines.push("");
   lines.push(`schema sha256: ${result.schemaHash.slice(0, 12)}…`);
   lines.push(`node-implemented:        ${result.nodeImplemented.length}`);
+  lines.push(`apollo-ok-not-node:      ${result.apolloCompatibleNotNode.length}  ${badge(result.apolloCompatibleNotNode.length, "info")}`);
   lines.push(`value-objects:           ${result.valueObject.length}`);
   lines.push(`custom-handled:          ${result.customHandled.length}`);
   lines.push(`custom-but-not-node:     ${result.customButNotNode.length}  ${badge(result.customButNotNode.length)}`);
@@ -17,6 +18,15 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
     lines.push(`resolved since baseline: ${result.resolvedSinceBaseline.length}`);
   }
   lines.push("");
+
+  if (result.apolloCompatibleNotNode.length > 0) {
+    lines.push("ℹ Types Apollo normalizes via id/_id, but missing Node interface");
+    lines.push("   (cache works; Relay Global Object Identification non-compliant)");
+    for (const n of result.apolloCompatibleNotNode) {
+      lines.push(`   - ${n}`);
+    }
+    lines.push("");
+  }
 
   if (result.invalidKeyFields.length > 0) {
     lines.push("✗ typePolicies.keyFields references fields not present in the schema");
@@ -71,6 +81,7 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
   return lines.join("\n");
 }
 
-function badge(n: number): string {
-  return n > 0 ? "←" : "";
+function badge(n: number, kind: "warn" | "info" = "warn"): string {
+  if (n === 0) return "";
+  return kind === "info" ? "ℹ" : "←";
 }

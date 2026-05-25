@@ -1,0 +1,29 @@
+# Apollo cache compatibility without Node interface.
+#
+# Article declares `id: ID!` but does NOT implement Node. Apollo InMemoryCache
+# normalizes it via defaultDataIdFromObject (id is present), so cache works
+# perfectly. Relay Global Object Identification is non-compliant though, so
+# code that relies on Node-typed queries (e.g. fragment refetch via node(id:))
+# would break.
+#
+# Expected: Article is bucketed as apolloCompatibleNotNode, not nodeImplemented.
+
+interface Node {
+  id: ID!
+}
+
+type Query {
+  article(id: ID!): Article
+  user(id: ID!): User
+}
+
+type Article {
+  id: ID!
+  title: String!
+}
+
+# User implements Node and has id — the textbook case.
+type User implements Node {
+  id: ID!
+  name: String!
+}

@@ -30,6 +30,7 @@ export interface ClassifyInput {
 
 export interface Classification {
   nodeImplemented: string[];
+  apolloCompatibleNotNode: string[];
   valueObject: ValueObjectInfo[];
   customHandled: CustomCacheInfo[];
   customButNotNode: CustomCacheInfo[];
@@ -63,6 +64,7 @@ export function classify(input: ClassifyInput): Classification {
   for (const c of cacheConfig.customHandled) customByName.set(c.name, c);
 
   const nodeImplemented: string[] = [];
+  const apolloCompatibleNotNode: string[] = [];
   const valueObject: ValueObjectInfo[] = [];
   const customHandled: CustomCacheInfo[] = [];
   const customButNotNode: CustomCacheInfo[] = [];
@@ -85,8 +87,13 @@ export function classify(input: ClassifyInput): Classification {
       if (custom) {
         if (isNode) customHandled.push(custom);
         else customButNotNode.push(custom);
-      } else {
+      } else if (isNode) {
         nodeImplemented.push(t.name);
+      } else {
+        // Apollo cache normalizes (id/_id field present), but the schema does not
+        // declare Node interface implementation. Informational — Apollo works,
+        // but Relay GOI is non-compliant.
+        apolloCompatibleNotNode.push(t.name);
       }
       continue;
     }
@@ -121,6 +128,7 @@ export function classify(input: ClassifyInput): Classification {
   }
 
   nodeImplemented.sort();
+  apolloCompatibleNotNode.sort();
   valueObject.sort((a, b) => a.name.localeCompare(b.name));
   customHandled.sort((a, b) => a.name.localeCompare(b.name));
   customButNotNode.sort((a, b) => a.name.localeCompare(b.name));
@@ -129,6 +137,7 @@ export function classify(input: ClassifyInput): Classification {
 
   return {
     nodeImplemented,
+    apolloCompatibleNotNode,
     valueObject,
     customHandled,
     customButNotNode,

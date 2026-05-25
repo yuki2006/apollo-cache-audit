@@ -44,7 +44,14 @@ export interface InvalidKeyFieldsInfo {
 }
 
 export interface AuditResult {
+  /** Object types that implement the Node interface AND normalize via default id. */
   nodeImplemented: string[];
+  /**
+   * Object types that Apollo normalizes via default id/_id but do NOT implement the Node interface.
+   * Apollo cache works fine, but the schema is Relay-non-compliant. Informational by default;
+   * gate strict Relay adoption via --fail-on-not-node.
+   */
+  apolloCompatibleNotNode: string[];
   valueObject: ValueObjectInfo[];
   customHandled: CustomCacheInfo[];
   customButNotNode: CustomCacheInfo[];
@@ -97,6 +104,7 @@ export interface CliOptions {
   failOn?: FailOn;
   failOnCustomWithoutNode?: boolean;
   failOnInvalidKeyfields?: boolean;
+  failOnNotNode?: boolean;
   report?: string;
   verbose?: boolean;
 }

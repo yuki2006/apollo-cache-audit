@@ -36,6 +36,7 @@ program
   )
   .option("--fail-on-custom-without-node", "Exit non-zero on customButNotNode findings")
   .option("--fail-on-invalid-keyfields", "Exit non-zero when typePolicies.keyFields references missing schema fields")
+  .option("--fail-on-not-node", "Exit non-zero on types that normalize via id but do not implement the Node interface")
   .option("--report <path>", "Write report to file (in --format)")
   .option("--verbose", "Verbose logging")
   .action(async (opts: CliOptions) => {
@@ -129,6 +130,9 @@ async function run(opts: CliOptions) {
     code = 1;
   }
   if (opts.failOnInvalidKeyfields && result.invalidKeyFields.length > 0) {
+    code = 1;
+  }
+  if (opts.failOnNotNode && result.apolloCompatibleNotNode.length > 0) {
     code = 1;
   }
   process.exit(code);

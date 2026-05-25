@@ -95,6 +95,13 @@ test("bug-cursorless-pagination: Item flagged", async () => {
   assert.deepEqual(names, ["Item"]);
 });
 
+test("id-without-node: id-bearing types without Node interface bucket separately", async () => {
+  const r = await runFixture("id-without-node");
+  assert.deepEqual(r.nodeImplemented, ["User"]);
+  assert.deepEqual(r.apolloCompatibleNotNode, ["Article"]);
+  assert.equal(r.nodePromotionCandidate.length, 0);
+});
+
 test("invalid-keyfields: detects missing fields referenced by typePolicies", async () => {
   const r = await runFixture("invalid-keyfields");
   assert.equal(r.invalidKeyFields.length, 1);
