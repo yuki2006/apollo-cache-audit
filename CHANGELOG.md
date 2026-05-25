@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.3
+
+### Fixes
+
+- **Method-shorthand `dataIdFromObject(o) { ... }` now detected.** Previously, only the property-assignment form (`dataIdFromObject: (o) => { ... }`) was recognized. The method-shorthand variant — semantically equivalent and accepted by Apollo at runtime — was silently ignored, causing every switch case inside to slip past the AST extractor. Common in real-world Apollo configs migrated from Apollo Client v2.
+
+Fixture: `method-shorthand-dataid/`. Test count: 40 → 41.
+
 ## 0.5.2
 
 ### Fixes

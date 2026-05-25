@@ -223,6 +223,16 @@ test("card-ref-pattern: switch case 'Card' with nested __ref access detects Card
   assert.deepEqual(names, ["Card"]);
 });
 
+test("method-shorthand-dataid: dataIdFromObject(o){...} method-form detected", async () => {
+  // Cache config uses method-shorthand syntax (MethodDeclaration), not the more common
+  // property-assignment arrow form. Both are valid TS and behave identically at runtime;
+  // the audit must extract switch cases from either.
+  const r = await runFixture("method-shorthand-dataid");
+  const names = r.customButNotNode.map((c) => c.name).sort();
+  assert.deepEqual(names, ["Card"]);
+  assert.equal(r.nodePromotionCandidate.length, 0);
+});
+
 test("keyfields-false: explicit opt-out lands in customHandled, not candidate", async () => {
   // typePolicies[ChildItem].keyFields = false is the user explicitly saying "don't
   // normalize this type". It must not be flagged as a promotion candidate.

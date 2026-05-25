@@ -1,0 +1,25 @@
+# Same Card-via-__ref pattern as card-ref-pattern, but the cache config uses
+# method shorthand (`dataIdFromObject(o) {...}`) instead of property assignment
+# (`dataIdFromObject: (o) => {...}`). Both are valid TS; Apollo accepts both.
+
+interface Node {
+  id: ID!
+}
+
+type Query {
+  card: Card
+}
+
+type Card {
+  front: Resource
+  back: Resource
+}
+
+type Resource implements Node {
+  id: ID!
+}
+
+type Container implements Node {
+  id: ID!
+  card: Card
+}

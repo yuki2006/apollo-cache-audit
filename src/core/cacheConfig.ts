@@ -294,18 +294,37 @@ function unwrapToFunction(def: Node): Node | undefined {
 }
 
 function extractFromConfigObject(obj: ObjectLiteralExpression, out: CacheConfigModel) {
-  for (const prop of getAllProperties(obj)) {
-    const name = getPropertyName(prop);
-    if (!name) continue;
-    if (name === "dataIdFromObject") {
-      const init = prop.getInitializer();
-      if (init) extractDataIdSwitchCases(init, out.dataIdTypes);
-    } else if (name === "typePolicies") {
-      const init = prop.getInitializer();
-      if (init) {
-        const resolved = resolveToObjectLiteral(init as Expression);
-        if (resolved) extractTypePolicies(resolved, out);
+  for (const prop of obj.getProperties()) {
+    // Spread: { ...basePolicies } — recurse into the spread source object.
+    if (Node.isSpreadAssignment(prop)) {
+      const inner = resolveToObjectLiteral(prop.getExpression());
+      if (inner) extractFromConfigObject(inner, out);
+      continue;
+    }
+
+    let name: string | undefined;
+    let body: Node | undefined;
+
+    if (Node.isPropertyAssignment(prop)) {
+      name = getPropertyName(prop);
+      body = prop.getInitializer();
+    } else if (Node.isMethodDeclaration(prop)) {
+      // Method shorthand: `dataIdFromObject(o) { ... }` is the same as the property-assignment
+      // form. Pass the MethodDeclaration itself; extractDataIdSwitchCases unwraps to .getBody().
+      const nameNode = prop.getNameNode();
+      if (Node.isIdentifier(nameNode) || Node.isStringLiteral(nameNode)) {
+        name = nameNode.getText().replace(/^["']|["']$/g, "");
+        body = prop;
       }
+    }
+
+    if (!name || !body) continue;
+
+    if (name === "dataIdFromObject") {
+      extractDataIdSwitchCases(body, out.dataIdTypes);
+    } else if (name === "typePolicies") {
+      const resolved = resolveToObjectLiteral(body as Expression);
+      if (resolved) extractTypePolicies(resolved, out);
     }
   }
 }
@@ -340,9 +359,15 @@ function getPropertyName(p: PropertyAssignment): string | undefined {
 }
 
 function extractDataIdSwitchCases(node: Node, out: Set<string>) {
-  // Function: arrow/expression/declaration — walk into its body.
+  // Function shapes that may carry the dataIdFromObject body:
+  //   - arrow: `dataIdFromObject: (o) => {...}`
+  //   - function expression: `dataIdFromObject: function(o) {...}`
+  //   - method shorthand: `dataIdFromObject(o) {...}`
   const body =
-    Node.isArrowFunction(node) || Node.isFunctionExpression(node)
+    Node.isArrowFunction(node) ||
+    Node.isFunctionExpression(node) ||
+    Node.isMethodDeclaration(node) ||
+    Node.isFunctionDeclaration(node)
       ? node.getBody()
       : node;
   if (!body) return;
