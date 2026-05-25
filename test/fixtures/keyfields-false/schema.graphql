@@ -1,0 +1,21 @@
+# typePolicies[ChildItem].keyFields = false is an explicit instruction to Apollo
+# NOT to normalize ChildItem (intentionally inlined). The audit should treat this
+# as a respected value-object declaration, NOT a nodePromotionCandidate.
+
+interface Node {
+  id: ID!
+}
+
+type Query {
+  cart: ParentCart
+}
+
+type ChildItem {
+  itemId: String!
+  count: Int!
+}
+
+type ParentCart implements Node {
+  id: ID!
+  items: [ChildItem!]!
+}

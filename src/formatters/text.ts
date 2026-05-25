@@ -55,8 +55,18 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
     lines.push("⚠ Types with custom cache config but no Node interface");
     lines.push("   (these are treated as entities by the cache but the schema declares no id)");
     for (const c of result.customButNotNode) {
-      const via = c.via === "dataIdFromObject" ? "dataIdFromObject" : `keyFields=${JSON.stringify(c.keyFields)}`;
-      lines.push(`   - ${c.name}  (${via})`);
+      lines.push(`   - ${c.name}  (${describeCustom(c)})`);
+    }
+    lines.push("");
+  }
+
+  const explicitOptOut = result.customHandled.filter(
+    (c) => c.via === "typePolicies.keyFields" && c.keyFields === false,
+  );
+  if (explicitOptOut.length > 0) {
+    lines.push("ℹ Types explicitly opted out of normalization (typePolicies.keyFields = false)");
+    for (const c of explicitOptOut) {
+      lines.push(`   - ${c.name}`);
     }
     lines.push("");
   }
@@ -108,6 +118,12 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
 function badge(n: number, kind: "warn" | "info" = "warn"): string {
   if (n === 0) return "";
   return kind === "info" ? "ℹ" : "←";
+}
+
+function describeCustom(c: { via: string; keyFields?: readonly string[] | "fn" | false }): string {
+  if (c.via === "dataIdFromObject") return "dataIdFromObject";
+  if (c.keyFields === false) return "keyFields=false (inlined)";
+  return `keyFields=${JSON.stringify(c.keyFields)}`;
 }
 
 function formatReferences(c: NodeCandidateInfo): string {

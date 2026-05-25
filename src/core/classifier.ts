@@ -72,6 +72,18 @@ export function classify(input: ClassifyInput): Classification {
     const isNode = schemaModel.nodeImplementorNames.has(t.name);
     const custom = customByName.get(t.name);
 
+    // Explicit opt-out: typePolicies[T].keyFields = false. The user has declared this type
+    // should NOT be normalized. Surface in customHandled so the audit doesn't flag it as a
+    // promotion candidate (the user has already made the decision).
+    if (
+      custom &&
+      custom.via === "typePolicies.keyFields" &&
+      custom.keyFields === false
+    ) {
+      customHandled.push(custom);
+      continue;
+    }
+
     if (outcome?.normalizes) {
       if (custom) {
         if (isNode) customHandled.push(custom);

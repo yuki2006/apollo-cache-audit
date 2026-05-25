@@ -32,7 +32,12 @@ export interface ValueObjectInfo {
 export interface CustomCacheInfo {
   name: string;
   via: "dataIdFromObject" | "typePolicies.keyFields";
-  keyFields?: readonly string[] | "fn";
+  /**
+   * - readonly string[]: explicit composite key field list
+   * - "fn": function-form keyFields (opaque to static analysis)
+   * - false: explicit opt-out — user declared this type should NOT be normalized
+   */
+  keyFields?: readonly string[] | "fn" | false;
 }
 
 export type Recommendation =

@@ -106,7 +106,8 @@ export function loadCacheConfig({
     merged.customHandled.push({ name: t, via: "dataIdFromObject" });
   }
   for (const [t, keyFields] of merged.keyFieldsTypes) {
-    if (keyFields === false) continue;
+    // keyFields: false is also "custom-handled" — it's an explicit user declaration that
+    // this type should NOT be normalized. Surface it so we don't suggest the user add an id.
     merged.customHandled.push({
       name: t,
       via: "typePolicies.keyFields",

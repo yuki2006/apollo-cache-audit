@@ -223,6 +223,17 @@ test("card-ref-pattern: switch case 'Card' with nested __ref access detects Card
   assert.deepEqual(names, ["Card"]);
 });
 
+test("keyfields-false: explicit opt-out lands in customHandled, not candidate", async () => {
+  // typePolicies[ChildItem].keyFields = false is the user explicitly saying "don't
+  // normalize this type". It must not be flagged as a promotion candidate.
+  const r = await runFixture("keyfields-false");
+  assert.equal(r.nodePromotionCandidate.length, 0);
+  const item = r.customHandled.find((c) => c.name === "ChildItem");
+  assert.ok(item);
+  assert.equal(item.via, "typePolicies.keyFields");
+  assert.equal(item.keyFields, false);
+});
+
 test("const-case-label: switch case CONST: resolves through identifier definitions", async () => {
   // `case CARD_TYPENAME:` where CARD_TYPENAME is a const-declared string literal.
   // Without identifier resolution, Card was being mis-bucketed as nodePromotionCandidate.

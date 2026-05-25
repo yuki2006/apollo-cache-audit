@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.2
+
+### Fixes
+
+- **`typePolicies[T].keyFields = false` no longer flagged as nodePromotionCandidate.** An explicit opt-out from normalization is a deliberate user decision; the audit should respect it. These types now land in `customHandled` with `keyFields: false`, and a dedicated summary section ("Types explicitly opted out of normalization") surfaces them so reviewers can see the declarations were respected. Closes the user-reported gap where ~10 intentional value-object types required `--ignore-types` workarounds.
+
+Fixture: `keyfields-false/`. Test count: 39 → 40.
+
 ## 0.5.1
 
 ### Fixes
