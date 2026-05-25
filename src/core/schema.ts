@@ -7,10 +7,23 @@ import {
   GraphQLSchema,
   isInterfaceType,
   isObjectType,
+  isUnionType,
   type GraphQLNamedType,
 } from "graphql";
 
 const ROOT_TYPE_NAMES = new Set(["Query", "Mutation", "Subscription"]);
+
+export type ReferenceKind = "direct" | "interface" | "union";
+
+export interface ReferenceEdge {
+  parent: string;
+  kind: ReferenceKind;
+  /**
+   * For 'interface' or 'union' edges, the abstract type the field declares. Distinguishes
+   * "Article.feed: FeedItem (interface)" from "Article.author: Author (direct)".
+   */
+  abstractType?: string;
+}
 
 export interface SchemaModel {
   schema: GraphQLSchema;
@@ -20,8 +33,11 @@ export interface SchemaModel {
   objectTypes: GraphQLObjectType[];
   /** Object types that implement the Node interface. */
   nodeImplementorNames: Set<string>;
-  /** typeName -> set of parent type names that reference it as a field. */
-  referencedBy: Map<string, Set<string>>;
+  /**
+   * typeName -> set of parent edges. An edge records both the parent type and how the parent
+   * reaches it (directly, via interface implementation, or via union membership).
+   */
+  referencedBy: Map<string, ReferenceEdge[]>;
   /** typeName -> 1-indexed line number from SDL location (if available). */
   lineByType: Map<string, number>;
   nodeInterface: GraphQLInterfaceType | undefined;
@@ -112,16 +128,27 @@ function findNodeInterface(
 function buildReferenceGraph(
   objectTypes: GraphQLObjectType[],
   schema: GraphQLSchema,
-): Map<string, Set<string>> {
-  const graph = new Map<string, Set<string>>();
+): Map<string, ReferenceEdge[]> {
+  const graph = new Map<string, ReferenceEdge[]>();
 
-  const addEdge = (child: string, parent: string) => {
-    let set = graph.get(child);
-    if (!set) {
-      set = new Set<string>();
-      graph.set(child, set);
+  const addEdge = (child: string, edge: ReferenceEdge) => {
+    let list = graph.get(child);
+    if (!list) {
+      list = [];
+      graph.set(child, list);
     }
-    set.add(parent);
+    // Dedupe by (parent, kind, abstractType) — a parent may legitimately reference the same
+    // child via multiple fields, but the edge identity is the same.
+    if (
+      !list.some(
+        (e) =>
+          e.parent === edge.parent &&
+          e.kind === edge.kind &&
+          e.abstractType === edge.abstractType,
+      )
+    ) {
+      list.push(edge);
+    }
   };
 
   for (const parent of objectTypes) {
@@ -134,10 +161,22 @@ function buildReferenceGraph(
       const namedType = schema.getType(named);
       if (!namedType) continue;
       if (isObjectType(namedType)) {
-        addEdge(namedType.name, parent.name);
+        addEdge(namedType.name, { parent: parent.name, kind: "direct" });
       } else if (isInterfaceType(namedType)) {
         for (const impl of schema.getImplementations(namedType).objects) {
-          addEdge(impl.name, parent.name);
+          addEdge(impl.name, {
+            parent: parent.name,
+            kind: "interface",
+            abstractType: namedType.name,
+          });
+        }
+      } else if (isUnionType(namedType)) {
+        for (const member of namedType.getTypes()) {
+          addEdge(member.name, {
+            parent: parent.name,
+            kind: "union",
+            abstractType: namedType.name,
+          });
         }
       }
     }

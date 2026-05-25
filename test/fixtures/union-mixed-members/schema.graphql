@@ -1,0 +1,29 @@
+# Union with mixed Node/non-Node members. The audit should:
+#   - Treat Photo as nodeImplemented (has id, implements Node)
+#   - Treat Video as a candidate, with referencedEdges showing
+#     "via union FeedItem" rather than a direct reference from Article.
+
+interface Node {
+  id: ID!
+}
+
+union FeedItem = Photo | Video
+
+type Query {
+  article(id: ID!): Article
+}
+
+type Article implements Node {
+  id: ID!
+  feed: FeedItem
+}
+
+type Photo implements Node {
+  id: ID!
+  url: String!
+}
+
+type Video {
+  title: String!
+  duration: Int!
+}

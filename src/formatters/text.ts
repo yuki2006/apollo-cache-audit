@@ -1,4 +1,4 @@
-import type { AuditResult } from "../types.js";
+import type { AuditResult, NodeCandidateInfo } from "../types.js";
 
 export function formatText(result: AuditResult, opts: { baselineUsed: boolean }): string {
   const lines: string[] = [];
@@ -55,8 +55,13 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
     lines.push("   (referenced from a Node-implementing type; likely entities)");
     for (const c of candidates) {
       const loc = c.line ? ` (${c.file ?? "schema"}:${c.line})` : "";
-      const refs = c.referencedFrom.length > 0 ? ` ← ${c.referencedFrom.join(", ")}` : "";
+      const refs = formatReferences(c);
       lines.push(`   - ${c.name}${loc}${refs}`);
+      if (c.referencedFromChain && c.referencedFromChain.length > 0) {
+        for (const chain of c.referencedFromChain) {
+          lines.push(`       via: ${chain.join(" → ")}`);
+        }
+      }
       if (c.recommendation) {
         const conf = c.recommendation.confidence;
         lines.push(`       suggest [${conf}]: ${c.recommendation.primary} — ${c.recommendation.reason}`);
@@ -88,4 +93,15 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
 function badge(n: number, kind: "warn" | "info" = "warn"): string {
   if (n === 0) return "";
   return kind === "info" ? "ℹ" : "←";
+}
+
+function formatReferences(c: NodeCandidateInfo): string {
+  if (!c.referencedEdges || c.referencedEdges.length === 0) {
+    return c.referencedFrom.length > 0 ? ` ← ${c.referencedFrom.join(", ")}` : "";
+  }
+  const parts = c.referencedEdges.map((e) => {
+    if (e.kind === "direct") return e.parent;
+    return `${e.parent} (via ${e.kind} ${e.abstractType ?? "?"})`;
+  });
+  return ` ← ${parts.join(", ")}`;
 }

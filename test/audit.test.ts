@@ -173,6 +173,47 @@ test("recommendation: signals array is populated and sorted by weight", async ()
   }
 });
 
+test("multi-hop (off): ArticleSource is value-object without --multi-hop", async () => {
+  const r = await runFixture("multi-hop-reference");
+  const candidateNames = r.nodePromotionCandidate.map((c) => c.name);
+  assert.ok(!candidateNames.includes("ArticleSource"));
+  const valueObjectNames = r.valueObject.map((v) => v.name);
+  assert.ok(valueObjectNames.includes("ArticleSource"));
+});
+
+test("multi-hop (on): ArticleSource becomes candidate via ArticleMetadata", async () => {
+  const r = await audit({
+    schema: resolve(fixtureDir("multi-hop-reference"), "schema.graphql"),
+    cacheConfig: resolve(fixtureDir("multi-hop-reference"), "cache-config.ts"),
+    multiHop: true,
+  });
+  const candidateNames = r.nodePromotionCandidate.map((c) => c.name).sort();
+  assert.deepEqual(candidateNames, ["ArticleMetadata", "ArticleSource"]);
+  const src = r.nodePromotionCandidate.find((c) => c.name === "ArticleSource");
+  assert.ok(src?.referencedFromChain);
+  assert.ok(
+    src.referencedFromChain.some(
+      (chain) =>
+        chain[0] === "ArticleSource" &&
+        chain.includes("ArticleMetadata") &&
+        chain.includes("Article"),
+    ),
+    "expected chain through ArticleMetadata to Article",
+  );
+});
+
+test("union-mixed-members: Video has referencedEdges with kind=union", async () => {
+  const r = await runFixture("union-mixed-members");
+  const video = r.nodePromotionCandidate.find((c) => c.name === "Video");
+  assert.ok(video, "expected Video candidate");
+  assert.ok(video.referencedEdges.length > 0);
+  const unionEdge = video.referencedEdges.find((e) => e.kind === "union");
+  assert.ok(unionEdge, "expected at least one union edge");
+  assert.equal(unionEdge.abstractType, "FeedItem");
+  assert.equal(unionEdge.parent, "Article");
+  assert.ok(r.nodeImplemented.includes("Photo"));
+});
+
 test("invalid-keyfields: detects missing fields referenced by typePolicies", async () => {
   const r = await runFixture("invalid-keyfields");
   assert.equal(r.invalidKeyFields.length, 1);

@@ -13,6 +13,11 @@ export interface AuditOptions {
   ignoreTypes?: string[];
   /** Path to baseline JSON, or pre-loaded baseline data. */
   baseline?: string | BaselineData;
+  /**
+   * When true, also traverse transitively through non-normalized intermediate types when
+   * computing reachability from normalized parents. Defaults to false (1-hop only).
+   */
+  multiHop?: boolean;
 }
 
 export interface ValueObjectInfo {
@@ -52,10 +57,26 @@ export interface RecommendationInfo {
   reason: string;
 }
 
+export type ReferenceKind = "direct" | "interface" | "union";
+
+export interface ReferenceEdgeInfo {
+  parent: string;
+  kind: ReferenceKind;
+  /** For interface/union edges, the declared abstract type. */
+  abstractType?: string;
+}
+
 export interface NodeCandidateInfo {
   name: string;
-  /** Parent Node-implementing types that reference this type as a field. */
+  /** Parent normalized types that reference this type (flat list, sorted). */
   referencedFrom: string[];
+  /** Detailed edge information (parent + kind + abstractType). */
+  referencedEdges: ReferenceEdgeInfo[];
+  /**
+   * Multi-hop reachability paths from this candidate to a normalized ancestor (--multi-hop).
+   * Each path is ordered candidate-first: [Candidate, Intermediate1, ..., NormalizedAncestor].
+   */
+  referencedFromChain?: string[][];
   /** Source SDL location (1-indexed line) when available. */
   line?: number;
   /** Source SDL file path when known. */
@@ -134,6 +155,7 @@ export interface CliOptions {
   failOnInvalidKeyfields?: boolean;
   failOnNotNode?: boolean;
   strictRecommend?: boolean;
+  multiHop?: boolean;
   report?: string;
   verbose?: boolean;
 }

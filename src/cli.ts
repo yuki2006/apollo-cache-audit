@@ -38,6 +38,7 @@ program
   .option("--fail-on-invalid-keyfields", "Exit non-zero when typePolicies.keyFields references missing schema fields")
   .option("--fail-on-not-node", "Exit non-zero on types that normalize via id but do not implement the Node interface")
   .option("--strict-recommend", "Omit recommendations with low confidence (only emit medium/high)")
+  .option("--multi-hop", "Traverse transitively through non-normalized intermediates (may surface more candidates)")
   .option("--report <path>", "Write report to file (in --format)")
   .option("--verbose", "Verbose logging")
   .action(async (opts: CliOptions) => {
@@ -62,6 +63,7 @@ async function run(opts: CliOptions) {
     ignoreSuffixes,
     ignoreTypes,
     baseline: opts.baseline,
+    multiHop: opts.multiHop,
   });
 
   if (opts.strictRecommend) {

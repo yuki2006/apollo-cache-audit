@@ -1,0 +1,26 @@
+# Multi-hop reachability. ArticleSource is only reachable via ArticleMetadata,
+# which is itself an un-normalized value object. Without --multi-hop, ArticleSource
+# lands in valueObject. With --multi-hop, it surfaces as a candidate with the
+# chain [ArticleSource, ArticleMetadata, Article] recorded.
+
+interface Node {
+  id: ID!
+}
+
+type Query {
+  article(id: ID!): Article
+}
+
+type Article implements Node {
+  id: ID!
+  metadata: ArticleMetadata
+}
+
+type ArticleMetadata {
+  source: ArticleSource
+}
+
+type ArticleSource {
+  url: String!
+  attribution: String
+}

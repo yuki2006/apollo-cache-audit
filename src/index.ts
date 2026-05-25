@@ -17,7 +17,14 @@ export async function audit(options: AuditOptions): Promise<AuditResult> {
   });
 
   const probe = buildProbe(schemaModel, cacheConfig);
-  const cls = classify({ schemaModel, cacheConfig, probe, ignoreSuffixes, ignoreTypes });
+  const cls = classify({
+    schemaModel,
+    cacheConfig,
+    probe,
+    ignoreSuffixes,
+    ignoreTypes,
+    multiHop: options.multiHop,
+  });
 
   const baseline = resolveBaseline(options.baseline);
   let newSinceBaseline: AuditResult["newSinceBaseline"] = [];

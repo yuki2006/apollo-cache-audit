@@ -2,9 +2,10 @@ import type {
   CustomCacheInfo,
   InvalidKeyFieldsInfo,
   NodeCandidateInfo,
+  ReferenceEdgeInfo,
   ValueObjectInfo,
 } from "../types.js";
-import type { SchemaModel } from "./schema.js";
+import type { ReferenceEdge, SchemaModel } from "./schema.js";
 import type { CacheConfigModel } from "./cacheConfig.js";
 import type { ProbeResult } from "./apolloProbe.js";
 import { recommend } from "./recommend.js";
@@ -27,6 +28,8 @@ export interface ClassifyInput {
   probe: ProbeResult;
   ignoreSuffixes: string[];
   ignoreTypes: Set<string>;
+  /** Walk transitively through non-normalized intermediates when computing reachability. */
+  multiHop?: boolean;
 }
 
 export interface Classification {
@@ -39,30 +42,18 @@ export interface Classification {
   invalidKeyFields: InvalidKeyFieldsInfo[];
 }
 
-/**
- * Classification strategy: Apollo's actual cache.identify() outcome is the source of truth for
- * "will this type be normalized?". The Node-interface convention is used only to distinguish
- * customHandled vs customButNotNode (a contract concern, not a behavioral one).
- *
- *   probe outcome              | Node implemented? | classification
- *   ---------------------------|-------------------|----------------------------------
- *   invalid-keyfields          | any               | invalidKeyFields (highest priority)
- *   normalized-with-id         | yes               | nodeImplemented
- *   normalized-with-id         | no                | nodeImplemented (de-facto entity:
- *                              |                   |   schema has id field, normalizes)
- *   normalized-with-keyfields  | yes               | customHandled
- *   normalized-with-keyfields  | no                | customButNotNode
- *   normalized-via-custom-..   | yes               | customHandled
- *   normalized-via-custom-..   | no                | customButNotNode
- *   not-normalized-no-key      | -                 | valueObject OR nodePromotionCandidate
- *                              |                   |   (depending on suffix + referenced-by)
- */
 export function classify(input: ClassifyInput): Classification {
-  const { schemaModel, cacheConfig, probe, ignoreSuffixes, ignoreTypes } = input;
+  const { schemaModel, cacheConfig, probe, ignoreSuffixes, ignoreTypes, multiHop } =
+    input;
 
   const suffixRegex = buildSuffixRegex(ignoreSuffixes);
   const customByName = new Map<string, CustomCacheInfo>();
   for (const c of cacheConfig.customHandled) customByName.set(c.name, c);
+
+  const isNormalized = (name: string) => {
+    const po = probe.outcomes.get(name);
+    return Boolean(po?.normalizes);
+  };
 
   const nodeImplemented: string[] = [];
   const apolloCompatibleNotNode: string[] = [];
@@ -76,10 +67,7 @@ export function classify(input: ClassifyInput): Classification {
     if (ignoreTypes.has(t.name)) continue;
 
     const outcome = probe.outcomes.get(t.name);
-    if (outcome?.reason === "invalid-keyfields") {
-      // Already collected in invalidKeyFields above; don't double-classify.
-      continue;
-    }
+    if (outcome?.reason === "invalid-keyfields") continue;
 
     const isNode = schemaModel.nodeImplementorNames.has(t.name);
     const custom = customByName.get(t.name);
@@ -91,9 +79,6 @@ export function classify(input: ClassifyInput): Classification {
       } else if (isNode) {
         nodeImplemented.push(t.name);
       } else {
-        // Apollo cache normalizes (id/_id field present), but the schema does not
-        // declare Node interface implementation. Informational — Apollo works,
-        // but Relay GOI is non-compliant.
         apolloCompatibleNotNode.push(t.name);
       }
       continue;
@@ -110,22 +95,53 @@ export function classify(input: ClassifyInput): Classification {
       continue;
     }
 
-    const parents = schemaModel.referencedBy.get(t.name) ?? new Set<string>();
-    const normalizedParents = [...parents].filter((p) => {
-      const po = probe.outcomes.get(p);
-      return Boolean(po?.normalizes);
-    });
-    if (normalizedParents.length === 0) {
+    const edges = schemaModel.referencedBy.get(t.name) ?? [];
+    const directNormalizedEdges = edges.filter((e) => isNormalized(e.parent));
+
+    let candidateEdges: ReferenceEdge[] = directNormalizedEdges;
+    let chains: string[][] | undefined;
+
+    if (candidateEdges.length === 0 && multiHop) {
+      chains = findIndirectChains(t.name, schemaModel.referencedBy, isNormalized);
+      if (chains.length === 0) {
+        valueObject.push({ name: t.name, reason: "not-referenced-from-node" });
+        continue;
+      }
+      // Multi-hop: synthesize edges from the last hop of each chain (parent before the
+      // normalized ancestor) so referencedFrom still resolves to a useful set.
+      const lastHops = new Map<string, ReferenceEdge>();
+      for (const chain of chains) {
+        // chain is [Candidate, Intermediate..., NormalizedAncestor]; last hop is the parent
+        // that bridges to the normalized ancestor.
+        const ancestor = chain[chain.length - 1]!;
+        const parent = chain[chain.length - 2]!;
+        if (!lastHops.has(ancestor)) {
+          lastHops.set(ancestor, { parent: ancestor, kind: "direct" });
+        }
+        // Also include the intermediate parent that referenced this candidate directly.
+        if (chain.length >= 2) {
+          const directParent = chain[1]!;
+          if (!lastHops.has(directParent)) {
+            lastHops.set(directParent, { parent: directParent, kind: "direct" });
+          }
+        }
+      }
+      candidateEdges = [...lastHops.values()];
+    } else if (candidateEdges.length === 0) {
       valueObject.push({ name: t.name, reason: "not-referenced-from-node" });
       continue;
     }
 
-    const referencedFromSorted = normalizedParents.sort();
-    // Recommendation is filled in a second pass below, after we know all candidate names
-    // for cross-candidate signals like suffix grouping.
+    const referencedFrom = [...new Set(candidateEdges.map((e) => e.parent))].sort();
+    const referencedEdges: ReferenceEdgeInfo[] = candidateEdges
+      .map((e) => ({ parent: e.parent, kind: e.kind, abstractType: e.abstractType }))
+      .sort(compareEdge);
+
     nodePromotionCandidate.push({
       name: t.name,
-      referencedFrom: referencedFromSorted,
+      referencedFrom,
+      referencedEdges,
+      referencedFromChain: chains,
       line: schemaModel.lineByType.get(t.name),
       file: schemaModel.schemaFilePath,
     });
@@ -137,8 +153,8 @@ export function classify(input: ClassifyInput): Classification {
   customHandled.sort((a, b) => a.name.localeCompare(b.name));
   customButNotNode.sort((a, b) => a.name.localeCompare(b.name));
   nodePromotionCandidate.sort((a, b) => a.name.localeCompare(b.name));
+  invalidKeyFields.sort((a, b) => a.type.localeCompare(b.type));
 
-  // Second pass: assign recommendations now that all candidate names are known.
   const allCandidateNames = nodePromotionCandidate.map((c) => c.name);
   for (const c of nodePromotionCandidate) {
     const objType = schemaModel.schema.getType(c.name);
@@ -150,7 +166,6 @@ export function classify(input: ClassifyInput): Classification {
       allCandidateNames,
     });
   }
-  invalidKeyFields.sort((a, b) => a.type.localeCompare(b.type));
 
   return {
     nodeImplemented,
@@ -161,6 +176,52 @@ export function classify(input: ClassifyInput): Classification {
     nodePromotionCandidate,
     invalidKeyFields,
   };
+}
+
+/**
+ * BFS from a candidate through non-normalized intermediate parents until a normalized
+ * ancestor is found. Returns all such paths up to a depth limit. Each path is
+ * [Candidate, ParentHop1, ..., NormalizedAncestor].
+ */
+function findIndirectChains(
+  start: string,
+  referencedBy: Map<string, ReferenceEdge[]>,
+  isNormalized: (name: string) => boolean,
+  maxDepth = 4,
+): string[][] {
+  const chains: string[][] = [];
+  type Frame = { node: string; path: string[] };
+  const queue: Frame[] = [{ node: start, path: [start] }];
+  const visited = new Set<string>([start]);
+
+  while (queue.length > 0) {
+    const { node, path } = queue.shift()!;
+    if (path.length > maxDepth + 1) continue;
+    const edges = referencedBy.get(node) ?? [];
+    for (const e of edges) {
+      if (path.includes(e.parent)) continue; // cycle guard
+      const nextPath = [...path, e.parent];
+      if (isNormalized(e.parent)) {
+        chains.push(nextPath);
+        continue;
+      }
+      // Don't traverse THROUGH a normalized ancestor — only continue through non-normalized
+      // intermediates. Also limit revisits.
+      if (visited.has(e.parent)) continue;
+      visited.add(e.parent);
+      queue.push({ node: e.parent, path: nextPath });
+    }
+  }
+
+  return chains;
+}
+
+function compareEdge(a: ReferenceEdgeInfo, b: ReferenceEdgeInfo): number {
+  return (
+    a.parent.localeCompare(b.parent) ||
+    a.kind.localeCompare(b.kind) ||
+    (a.abstractType ?? "").localeCompare(b.abstractType ?? "")
+  );
 }
 
 function buildSuffixRegex(suffixes: string[]): RegExp | undefined {
