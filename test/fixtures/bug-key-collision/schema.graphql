@@ -1,0 +1,35 @@
+# Bug pattern: "key collision merge"
+#
+# Symptom: A list query returns Posts each with their own Author. After a
+# different mutation runs, some Authors mysteriously change name to the value
+# of a different Author. The cache merge warning fires:
+#   "Cache data may be lost when replacing the author field of a Post object."
+#
+# Root cause: Author has no id, so Apollo inlines it inside each parent Post.
+# When two Posts have the SAME author (a legitimate possibility — same author
+# wrote both), Apollo merges the inlined Author objects under the same
+# normalized cache location IF a custom keyFields was added partially; or, if
+# no keyFields exists, Apollo emits the "cache data may be lost" warning and
+# the second author's fields overwrite the first.
+#
+# Expected audit finding: Author reported as nodePromotionCandidate
+# (referencedFrom = ['Post']).
+
+interface Node {
+  id: ID!
+}
+
+type Query {
+  posts: [Post!]!
+}
+
+type Post implements Node {
+  id: ID!
+  title: String!
+  author: Author!
+}
+
+type Author {
+  name: String!
+  bio: String
+}

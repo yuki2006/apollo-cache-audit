@@ -1,0 +1,39 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  article(id: ID!): Article
+  pageInfo: PageInfo
+}
+
+type Article implements Node {
+  id: ID!
+  title: String!
+  author: Author
+  stats: ArticleAggregation
+  tags: [Tag!]!
+}
+
+type Author implements Node {
+  id: ID!
+  name: String!
+}
+
+# Candidate: referenced by Article (a Node entity) but missing id.
+type Tag {
+  slug: String!
+  label: String!
+}
+
+# Value object: looks like an aggregation/stats type, suffix-ignored.
+type ArticleAggregation {
+  viewCount: Int!
+  likeCount: Int!
+}
+
+# Value object: not referenced from any Node entity.
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}

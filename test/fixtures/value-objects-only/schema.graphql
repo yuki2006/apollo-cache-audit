@@ -1,0 +1,13 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  health: Health
+}
+
+# No Node-implementing types reference these — pure value objects.
+type Health {
+  status: String!
+  uptime: Int!
+}

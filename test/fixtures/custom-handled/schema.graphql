@@ -1,0 +1,19 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  org(id: ID!): Organization
+}
+
+# Organization is treated as an entity by Apollo (dataIdFromObject case below),
+# but does NOT implement Node — this is the customButNotNode case.
+type Organization {
+  slug: ID!
+  name: String!
+}
+
+type Workspace implements Node {
+  id: ID!
+  org: Organization
+}

@@ -1,0 +1,34 @@
+# Bug pattern: "cursorless pagination infinite loop"
+#
+# Symptom: A list view calls fetchMore on scroll. The same items are returned
+# forever; the loading spinner never stops. Network tab shows the same page
+# being requested repeatedly with the same variables.
+#
+# Root cause: Feed.items contains Item objects with no id, so Apollo cannot
+# deduplicate items across pages. The merge function appends fetched items
+# without dedup, so the cache's items array grows but the deduplication that
+# would stop the loop never triggers. Even if the merge function tries to dedup
+# by reference equality, two cache writes produce two distinct inlined objects
+# with the same content but different identities.
+#
+# Expected audit finding: Item reported as nodePromotionCandidate
+# (referencedFrom = ['Feed']).
+
+interface Node {
+  id: ID!
+}
+
+type Query {
+  feed(offset: Int!): Feed
+}
+
+type Feed implements Node {
+  id: ID!
+  items: [Item!]!
+  hasMore: Boolean!
+}
+
+type Item {
+  title: String!
+  url: String!
+}

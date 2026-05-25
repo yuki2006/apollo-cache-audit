@@ -1,0 +1,21 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  a: A
+}
+
+type A implements Node {
+  id: ID!
+  b: B
+}
+
+type B implements Node {
+  id: ID!
+  c: C
+}
+
+type C implements Node {
+  id: ID!
+}

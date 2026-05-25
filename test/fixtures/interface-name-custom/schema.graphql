@@ -1,0 +1,16 @@
+interface INode {
+  id: ID!
+}
+
+type Query {
+  thing(id: ID!): Thing
+}
+
+type Thing implements INode {
+  id: ID!
+  detail: Detail
+}
+
+type Detail {
+  label: String!
+}

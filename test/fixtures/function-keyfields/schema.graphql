@@ -1,0 +1,18 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  membership(orgId: ID!, userId: ID!): Membership
+}
+
+type Membership {
+  orgId: ID!
+  userId: ID!
+  role: String!
+}
+
+type Workspace implements Node {
+  id: ID!
+  membership: Membership
+}

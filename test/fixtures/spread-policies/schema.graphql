@@ -1,0 +1,17 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  thing: Thing
+}
+
+type Thing implements Node {
+  id: ID!
+  extra: ExtraInfo
+}
+
+type ExtraInfo {
+  slug: ID!
+  label: String!
+}

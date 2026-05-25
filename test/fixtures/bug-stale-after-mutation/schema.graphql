@@ -1,0 +1,38 @@
+# Bug pattern: "stale after mutation"
+#
+# Symptom: After a mutation that should update an Article's stats, the UI
+# continues to display the previous values. Refreshing the page fixes it.
+#
+# Root cause: ArticleStats has no id, so Apollo InMemoryCache inlines it inside
+# the Article cache entry. When the mutation result writes back to the cache,
+# Apollo cannot match the inlined object to the existing one (no normalization
+# key), and the merge policy defaults to replacing only the explicitly
+# returned fields — partial updates do not propagate to other queries reading
+# the same Article. With Node + id, Apollo writes ArticleStats:<id> once and
+# every Article reading that stats reference updates atomically.
+#
+# Expected audit finding: ArticleStats reported as nodePromotionCandidate
+# (referencedFrom = ['Article']).
+
+interface Node {
+  id: ID!
+}
+
+type Query {
+  article(id: ID!): Article
+}
+
+type Mutation {
+  incrementLikes(articleId: ID!): Article
+}
+
+type Article implements Node {
+  id: ID!
+  title: String!
+  stats: ArticleStats!
+}
+
+type ArticleStats {
+  viewCount: Int!
+  likeCount: Int!
+}

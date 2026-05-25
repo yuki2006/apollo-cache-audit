@@ -1,0 +1,24 @@
+# Bug pattern: "keyFields references a field that does not exist"
+#
+# Symptom: At first identify() call, Apollo throws:
+#   Invariant Violation: Missing field 'orgId' while extracting keyFields
+#
+# Root cause: typePolicies.Membership.keyFields lists ['orgId', 'userId'], but the
+# Membership type in the schema actually declares organizationId / userId (probably
+# after a schema rename — the cache config was not updated in lockstep).
+#
+# Expected audit finding: Membership reported under invalidKeyFields with missingFields=['orgId'].
+
+interface Node {
+  id: ID!
+}
+
+type Query {
+  membership(id: ID!): Membership
+}
+
+type Membership {
+  organizationId: ID!
+  userId: ID!
+  role: String!
+}
