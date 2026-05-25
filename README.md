@@ -93,6 +93,9 @@ apollo-cache-audit --schema <path> --cache-config <path> [options]
 | `--fail-on-invalid-keyfields` | `false` | Exit non-zero when `typePolicies.keyFields` references a missing schema field |
 | `--fail-on-not-node` | `false` | Exit non-zero on types that normalize via id but lack `Node` interface (strict Relay) |
 | `--strict-recommend` | `false` | Omit low-confidence recommendations from output (only `medium`/`high` are emitted) |
+| `--multi-hop` | `false` | Walk transitively through non-normalized intermediates (Normalized→ValueObject→Candidate) |
+| `--cache-config <list>` | (required) | Comma-separate to merge multiple cache-config files (conflicts reported) |
+| `--format jsonschema` | — | Emit the AuditResult JSON Schema (no audit run; for downstream tooling) |
 | `--report <path>` | (none) | Write rendered output to a file instead of stdout |
 | `--verbose` | `false` | Verbose logging |
 

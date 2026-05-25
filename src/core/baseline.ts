@@ -6,7 +6,7 @@ import type {
   NodeCandidateInfo,
 } from "../types.js";
 
-export const BASELINE_TOOL_TAG = "apollo-cache-audit@0.3.0";
+export const BASELINE_TOOL_TAG = "apollo-cache-audit@0.4.0";
 
 export function loadBaseline(path: string): BaselineData {
   const raw = readFileSync(path, "utf8");

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0
+
+Completes the v0.3 milestone with the remaining roadmap items.
+
+### Features
+
+- **Reference graph edge kinds** (closes #4). Each candidate's `referencedEdges` now carries `kind: 'direct' | 'interface' | 'union'` plus the `abstractType` name for non-direct edges. The text formatter renders "via interface FeedItem" / "via union FeedItem" instead of just the parent name.
+- **Multi-hop reachability** (closes #3). New `--multi-hop` flag walks transitively through non-normalized intermediates. Candidates reachable only through value-object hops now surface, with the full reachability path in `referencedFromChain`.
+- **Multi-file cache config** (closes #5). `--cache-config` accepts a comma-separated list of paths. Per-type conflicts across files surface as `cacheConfigConflicts` (first writer wins).
+- **JSON Schema output** (closes #6). `--format jsonschema` emits the AuditResult JSON Schema (no audit run needed). Hand-maintained schema covers all v0.4 fields including new edge metadata and recommendation signals.
+
+### Tests
+
+- New fixtures: `multi-hop-reference/`, `union-mixed-members/`, `multi-config/`.
+- Test count: 25 → 32 (including new `test/jsonschema.test.ts`).
+
 ## 0.3.0
 
 Real-world feedback-driven release: a user reported that v0.2 still missed several `dataIdFromObject` patterns common in production code, and that the single-tier recommendation didn't scale to ~93 candidates. Both issues are addressed here.
