@@ -26,6 +26,16 @@ export interface CustomCacheInfo {
   keyFields?: readonly string[] | "fn";
 }
 
+export type Recommendation =
+  | "add-id"
+  | "mark-as-value-object"
+  | "add-suffix-rule";
+
+export interface RecommendationInfo {
+  primary: Recommendation;
+  reason: string;
+}
+
 export interface NodeCandidateInfo {
   name: string;
   /** Parent Node-implementing types that reference this type as a field. */
@@ -34,6 +44,8 @@ export interface NodeCandidateInfo {
   line?: number;
   /** Source SDL file path when known. */
   file?: string;
+  /** Heuristic-based suggestion for how to resolve this finding. */
+  recommendation?: RecommendationInfo;
 }
 
 export interface InvalidKeyFieldsInfo {

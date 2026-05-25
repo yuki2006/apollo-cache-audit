@@ -268,6 +268,9 @@ Your `typePolicies[T].keyFields` references a field name that doesn't exist on `
 **Q: What does `apolloCompatibleNotNode` mean?**
 The type has an `id` (or `_id`) field declared in the schema, so Apollo normalizes it via the default identifier. But it doesn't `implements Node`. Apollo cache will work correctly. The category exists so teams adopting Relay's Global Object Identification spec can see which types still need formal Node membership. Gate with `--fail-on-not-node` to make this a hard requirement.
 
+**Q: What is the `recommendation` field on candidates for?**
+Each `nodePromotionCandidate` carries a heuristic suggestion (`add-id`, `mark-as-value-object`, or `add-suffix-rule`) plus a `reason` string explaining which signals drove it (id-like field names, parent count, field count, suffix matches). The recommendation is **advisory**, not authoritative — schema authors know intent the tool cannot infer. The reason text is designed to let you confirm or override the suggestion quickly.
+
 **Q: Function-form `keyFields`?**
 Detected. The fields list will be reported as `"fn"` since static analysis can't enumerate the keys, but the type is correctly recognized as custom-handled.
 

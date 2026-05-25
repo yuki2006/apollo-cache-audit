@@ -57,6 +57,9 @@ export function formatText(result: AuditResult, opts: { baselineUsed: boolean })
       const loc = c.line ? ` (${c.file ?? "schema"}:${c.line})` : "";
       const refs = c.referencedFrom.length > 0 ? ` ← ${c.referencedFrom.join(", ")}` : "";
       lines.push(`   - ${c.name}${loc}${refs}`);
+      if (c.recommendation) {
+        lines.push(`       suggest: ${c.recommendation.primary} — ${c.recommendation.reason}`);
+      }
     }
     lines.push("");
   }

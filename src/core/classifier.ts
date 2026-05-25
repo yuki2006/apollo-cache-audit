@@ -7,6 +7,7 @@ import type {
 import type { SchemaModel } from "./schema.js";
 import type { CacheConfigModel } from "./cacheConfig.js";
 import type { ProbeResult } from "./apolloProbe.js";
+import { recommend } from "./recommend.js";
 
 export const DEFAULT_IGNORE_SUFFIXES = [
   "Response",
@@ -119,11 +120,17 @@ export function classify(input: ClassifyInput): Classification {
       continue;
     }
 
+    const referencedFromSorted = normalizedParents.sort();
     nodePromotionCandidate.push({
       name: t.name,
-      referencedFrom: normalizedParents.sort(),
+      referencedFrom: referencedFromSorted,
       line: schemaModel.lineByType.get(t.name),
       file: schemaModel.schemaFilePath,
+      recommendation: recommend({
+        type: t,
+        referencedFrom: referencedFromSorted,
+        activeIgnoreSuffixes: ignoreSuffixes,
+      }),
     });
   }
 
