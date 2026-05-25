@@ -214,6 +214,24 @@ test("union-mixed-members: Video has referencedEdges with kind=union", async () 
   assert.ok(r.nodeImplemented.includes("Photo"));
 });
 
+test("card-ref-pattern: switch case 'Card' with nested __ref access detects Card", async () => {
+  // Real-world dataIdFromObject where the return expression reads __ref from
+  // already-normalized nested references. The case label is still a string literal so
+  // detection should succeed regardless of the return-side complexity.
+  const r = await runFixture("card-ref-pattern");
+  const names = r.customButNotNode.map((c) => c.name);
+  assert.deepEqual(names, ["Card"]);
+});
+
+test("const-case-label: switch case CONST: resolves through identifier definitions", async () => {
+  // `case CARD_TYPENAME:` where CARD_TYPENAME is a const-declared string literal.
+  // Without identifier resolution, Card was being mis-bucketed as nodePromotionCandidate.
+  const r = await runFixture("const-case-label");
+  const names = r.customButNotNode.map((c) => c.name);
+  assert.deepEqual(names, ["Card"]);
+  assert.equal(r.nodePromotionCandidate.length, 0);
+});
+
 test("multi-config: merges two cache files and detects conflicts", async () => {
   const r = await audit({
     schema: resolve(fixtureDir("multi-config"), "schema.graphql"),

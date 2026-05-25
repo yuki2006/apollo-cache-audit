@@ -1,0 +1,25 @@
+# Real-world dataIdFromObject pattern where the return value reads `__ref` off
+# nested normalized references. The switch-case label is still a string literal
+# so static AST detection should capture it.
+
+interface Node {
+  id: ID!
+}
+
+type Query {
+  card(id: ID!): Card
+}
+
+type Page implements Node {
+  id: ID!
+}
+
+type Card {
+  front: Page
+  back: Page
+}
+
+type Container implements Node {
+  id: ID!
+  card: Card
+}

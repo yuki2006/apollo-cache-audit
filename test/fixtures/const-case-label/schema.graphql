@@ -1,0 +1,17 @@
+interface Node {
+  id: ID!
+}
+
+type Query {
+  card: Card
+}
+
+type Container implements Node {
+  id: ID!
+  card: Card
+}
+
+type Card {
+  front: ID!
+  back: ID!
+}

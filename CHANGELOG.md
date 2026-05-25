@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+### Fixes
+
+- **`case CONST_TYPENAME:` switch labels now resolved.** Previously, only string-literal case labels (`case 'Card':`) were extracted. Code that uses a const-declared typename (`const CARD_TYPENAME = 'Card'; switch (...) { case CARD_TYPENAME: ... }`) silently fell through to `nodePromotionCandidate`. Identifier references are now followed (including through `as const` and `satisfies` wrappers) and member access into const object literals (`Foo.TYPENAME`).
+
+Fixtures: `card-ref-pattern/`, `const-case-label/`. Test count: 37 → 39.
+
 ## 0.5.0
 
 ### Internal — runtime comparison test suite

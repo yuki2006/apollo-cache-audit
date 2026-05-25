@@ -346,12 +346,12 @@ function extractDataIdSwitchCases(node: Node, out: Set<string>) {
       : node;
   if (!body) return;
 
-  // Pattern 1: `case 'X':` in switch statements.
+  // Pattern 1: `case 'X':` and `case CONST:` (where CONST resolves to a string literal)
+  // in switch statements.
   for (const cc of body.getDescendantsOfKind(SyntaxKind.CaseClause)) {
     const expr = cc.getExpression();
-    if (Node.isStringLiteral(expr) || Node.isNoSubstitutionTemplateLiteral(expr)) {
-      out.add(expr.getLiteralText());
-    }
+    const literal = resolveToStringLiteral(expr);
+    if (literal !== undefined) out.add(literal);
   }
 
   // Pattern 2: `obj.__typename === 'X'` / `'X' === obj.__typename` comparisons.
@@ -460,6 +460,52 @@ function resolveToNewMapInitializer(node: Node): Node[] | undefined {
     if (first) keys.push(first);
   }
   return keys;
+}
+
+/**
+ * Resolve an expression to its underlying string literal value, following identifier
+ * references and stripping type wrappers (`as const`, `satisfies`, parens). Returns the
+ * literal text or undefined if the value cannot be resolved statically.
+ *
+ * Supports `case CONST:` patterns where CONST is `const X = 'literal'` (possibly with
+ * `as const`) or a member access into a const object.
+ */
+function resolveToStringLiteral(node: Node | undefined): string | undefined {
+  let cur: Node | undefined = node;
+  for (let i = 0; cur && i < 8; i++) {
+    const stripped = unwrapTypeAnnotations(cur);
+    if (stripped !== cur) {
+      cur = stripped;
+      continue;
+    }
+    if (Node.isStringLiteral(cur) || Node.isNoSubstitutionTemplateLiteral(cur)) {
+      return cur.getLiteralText();
+    }
+    if (Node.isIdentifier(cur)) {
+      const resolved = followIdentifier(cur);
+      if (!resolved) return undefined;
+      cur = resolved;
+      continue;
+    }
+    if (Node.isPropertyAccessExpression(cur)) {
+      // `Foo.TYPENAME` — look up the property in the resolved object literal.
+      const obj = resolveToObjectLiteral(cur.getExpression() as Expression);
+      if (!obj) return undefined;
+      const propName = cur.getName();
+      for (const prop of obj.getProperties()) {
+        if (Node.isPropertyAssignment(prop)) {
+          const name = getPropertyName(prop);
+          if (name === propName) {
+            const init = prop.getInitializer();
+            if (init) return resolveToStringLiteral(init);
+          }
+        }
+      }
+      return undefined;
+    }
+    return undefined;
+  }
+  return undefined;
 }
 
 function isTypenameAccess(n: Node): boolean {
