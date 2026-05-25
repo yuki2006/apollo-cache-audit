@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0
+
+### Internal — runtime comparison test suite
+
+Adds `test/runtime.test.ts`, which runs an actual Apollo Client `InMemoryCache` lifecycle (`writeFragment` + `extract`) for representative fixtures and verifies the audit's predictions agree with observed cache state. This catches:
+
+1. Probe-logic bugs where `cache.identify()` and the real write/normalize path diverge.
+2. Apollo version-bump regressions in behaviour that the probe path wouldn't see.
+3. Edge cases around nested writes / merge where the flat reachability model doesn't predict runtime shape.
+
+Fixtures covered: `basic`, `custom-handled`, `bug-key-collision`, `all-nodes`, `id-without-node`. Test count: 32 → 37.
+
+No public API changes.
+
 ## 0.4.0
 
 Completes the v0.3 milestone with the remaining roadmap items.
